@@ -37,11 +37,15 @@ export default function Register() {
     }
 
     // Backend will be added
+
     console.log("Registering user:", {
       fullName,
       email,
       password,
     });
+
+    localStorage.setItem("otpEmail", email);
+
   };
 
   return (
