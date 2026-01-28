@@ -1,32 +1,36 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-
-import Login from "./pages/login";
 import Register from "./pages/register";
-import Otp from "./pages/otp";
+import VerifyOtp from "./pages/verifyOTP";
+import Login from "./pages/login";
 import Home from "./pages/home";
-import ProtectedRoute from "./components/protectedRoute";
 
+// Simple auth check
+const isAuthenticated = () => {
+  return !!localStorage.getItem("token") ;
+};
+//
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Default */}
-        <Route path="/" element={<Navigate to="/login" />} />
+      <Route path="/" element={<Register />} />
+
 
         {/* Public routes */}
+        <Route path="/" element={<Register />} />
+        <Route path="/verify" element={<VerifyOtp />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/otp" element={<Otp />} />
 
         {/* Protected route */}
         <Route
           path="/home"
           element={
-            <ProtectedRoute>
-              <Home />
-            </ProtectedRoute>
+            isAuthenticated() ? <Home /> : <Navigate to="/login" />
           }
         />
+
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </BrowserRouter>
   );

@@ -1,28 +1,39 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import api from "../services/api";
 
-export default function Login() {
+export default function VerifyOtp() {
+  const [otp, setOtp] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e) => {
+  useEffect(() => {
+    const savedEmail = localStorage.getItem("otpEmail");
+    if (!savedEmail) {
+      window.location.href = "/";
+    } else {
+      setEmail(savedEmail);
+    }
+  }, []);
+
+  const handleVerify = async (e) => {
     e.preventDefault();
     setError("");
+
+    if (!otp) return setError("OTP required");
 
     try {
       setLoading(true);
 
-      const { data } = await api.post("/auth/login", {
+      await api.post("/auth/verify-otp", {
         email,
-        password,
+        otp,
       });
 
-      localStorage.setItem("token", data.token);
-      window.location.href = "/home";
+      localStorage.removeItem("otpEmail");
+      window.location.href = "/login";
     } catch (err) {
-      setError(err.response?.data?.message || "Login failed");
+      setError(err.response?.data?.message || "Verification failed");
     } finally {
       setLoading(false);
     }
@@ -31,22 +42,20 @@ export default function Login() {
   return (
     <div style={styles.page}>
       <div style={styles.card}>
-        <h1 style={styles.title}>SYSTEM LOGIN</h1>
+        <h1 style={styles.title}>VERIFY ACCESS</h1>
+        <p style={styles.subtitle}>
+          Enter the 6-digit code sent to<br />
+          <strong>{email}</strong>
+        </p>
 
         {error && <div style={styles.error}>{error}</div>}
 
-        <form onSubmit={handleLogin} style={styles.form}>
+        <form onSubmit={handleVerify} style={styles.form}>
           <input
-            placeholder="EMAIL"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={styles.input}
-          />
-          <input
-            placeholder="PASSWORD"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            value={otp}
+            onChange={(e) => setOtp(e.target.value)}
+            placeholder="OTP CODE"
+            maxLength={6}
             style={styles.input}
           />
 
@@ -58,13 +67,15 @@ export default function Login() {
               opacity: loading ? 0.6 : 1,
             }}
           >
-            {loading ? "AUTHORIZING…" : "LOGIN"}
+            {loading ? "VERIFYING…" : "VERIFY"}
           </button>
         </form>
       </div>
     </div>
   );
 }
+
+/* ---------- Styles ---------- */
 
 const styles = {
   page: {
@@ -84,10 +95,15 @@ const styles = {
     borderRadius: 12,
     border: "1px solid rgba(0,255,156,0.25)",
     boxShadow: "0 0 30px rgba(0,255,156,0.15)",
+    textAlign: "center",
   },
   title: {
-    textAlign: "center",
     letterSpacing: 3,
+    marginBottom: 10,
+  },
+  subtitle: {
+    fontSize: 13,
+    color: "rgba(0,255,156,0.7)",
     marginBottom: 20,
   },
   error: {
@@ -97,7 +113,6 @@ const styles = {
     borderRadius: 6,
     fontSize: 13,
     marginBottom: 16,
-    textAlign: "center",
   },
   form: {
     display: "flex",
@@ -105,11 +120,14 @@ const styles = {
     gap: 14,
   },
   input: {
-    padding: 12,
+    padding: 14,
     background: "#000",
     border: "1px solid rgba(0,255,156,0.35)",
     borderRadius: 8,
     color: "#00ff9c",
+    textAlign: "center",
+    fontSize: 18,
+    letterSpacing: 4,
     outline: "none",
   },
   button: {
