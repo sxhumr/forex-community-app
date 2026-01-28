@@ -1,23 +1,25 @@
 import express from "express";
 import bcrypt from "bcryptjs";
 import User from "../models/user.js";
-import { sendOtp } from "../utils/sendOtp.js";
+import {sendOtp} from "../utils/sendOTP.js";
 
 const router = express.Router();
 
 // REGISTER
 router.post("/register", async (req, res) => {
-  const { fullName, email, password } = req.body;
+  console.log("REGISTER BODY:", req.body);
+
+  const { username, email, password } = req.body;
 
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   const hashedOtp = await bcrypt.hash(otp, 10);
 
   const user = await User.create({
-    fullName,
-    email,
-    password,
-    otp: hashedOtp,
-    otpExpires: Date.now() + 10 * 60 * 1000, // 10 mins
+  username,
+  email,
+  password: hashedPassword,
+  otp: hashedOtp,
+ ///otpExpires: new Date.now() + 10 * 60 * 1000, // 10 mins
   });
 
   await sendOtp(email, otp);
@@ -32,8 +34,9 @@ router.post("/verify-otp", async (req, res) => {
   const user = await User.findOne({ email });
   if (!user) return res.status(400).json({ error: "User not found" });
 
-  if (user.otpExpires < Date.now())
-    return res.status(400).json({ error: "OTP expired" });
+if (!user.otpExpires || user.otpExpires.getTime() < Date.now()) {
+  return res.status(400).json({ message: "OTP expired" });
+}
 
   const isValid = await bcrypt.compare(otp, user.otp);
   if (!isValid)
