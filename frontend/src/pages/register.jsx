@@ -112,85 +112,98 @@ const styles = {
   page: {
     minHeight: "100vh",
     background:
-      "radial-gradient(circle at top, #001b12 0%, #000a06 40%, #000000 100%)",
+      "radial-gradient(circle at top, rgba(0,255,156,0.05), transparent 60%), #0b141a",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     fontFamily: "'JetBrains Mono', monospace",
-    color: "#00ff9c",
+    color: "#e5e7eb",
   },
+
   card: {
-    width: 420,
-    padding: "36px 32px",
-    background: "rgba(0, 15, 10, 0.85)",
-    borderRadius: 14,
-    border: "1px solid rgba(0,255,156,0.25)",
+    width: 440,
+    padding: "40px 36px",
+    background: "rgba(17, 27, 33, 0.92)",
+    borderRadius: 16,
+    border: "1px solid rgba(255,255,255,0.08)",
     boxShadow: "0 0 40px rgba(0,255,156,0.15)",
-    backdropFilter: "blur(6px)",
+    backdropFilter: "blur(8px)",
   },
+
   header: {
     textAlign: "center",
-    marginBottom: 28,
+    marginBottom: 30,
   },
+
   title: {
     margin: 0,
+    fontSize: 20,
     letterSpacing: 4,
-    fontSize: 22,
+    color: "#00ff9c",
   },
+
   subtitle: {
-    marginTop: 6,
-    fontSize: 12,
-    color: "rgba(0,255,156,0.6)",
-  },
-  error: {
-    background: "rgba(255,80,80,0.15)",
-    border: "1px solid rgba(255,80,80,0.4)",
-    color: "#ff6b6b",
-    padding: 10,
-    borderRadius: 6,
+    marginTop: 8,
     fontSize: 13,
-    marginBottom: 16,
+    color: "rgba(229,231,235,0.6)",
+  },
+
+  error: {
+    background: "rgba(239,68,68,0.12)",
+    border: "1px solid rgba(239,68,68,0.25)",
+    color: "#fca5a5",
+    padding: "10px 12px",
+    borderRadius: 8,
+    fontSize: 13,
+    marginBottom: 18,
     textAlign: "center",
   },
+
   form: {
     display: "flex",
     flexDirection: "column",
-    gap: 14,
+    gap: 16,
   },
+
   input: {
-    background: "#000",
-    border: "1px solid rgba(0,255,156,0.35)",
-    borderRadius: 8,
-    padding: "12px 14px",
-    color: "#00ff9c",
+    background: "#0b141a",
+    border: "1px solid rgba(255,255,255,0.12)",
+    borderRadius: 10,
+    padding: "14px 16px",
+    color: "#e5e7eb",
     outline: "none",
-    fontSize: 13,
-    letterSpacing: 1,
+    fontSize: 14,
+    letterSpacing: 0.5,
   },
+
   button: {
-    marginTop: 18,
-    padding: 14,
+    marginTop: 20,
+    padding: "14px",
     background:
-      "linear-gradient(135deg, #00ff9c 0%, #00cc7a 100%)",
+      "linear-gradient(135deg, #00a884 0%, #00ff9c 100%)",
     color: "#001b12",
     border: "none",
-    borderRadius: 8,
+    borderRadius: 10,
     cursor: "pointer",
-    fontWeight: "bold",
+    fontWeight: 600,
+    fontSize: 14,
     letterSpacing: 2,
-    boxShadow: "0 0 20px rgba(0,255,156,0.4)",
+    boxShadow: "0 0 18px rgba(0,255,156,0.35)",
   },
+
   footer: {
-    marginTop: 24,
+    marginTop: 26,
     display: "flex",
     justifyContent: "center",
     gap: 8,
     fontSize: 12,
-    color: "rgba(0,255,156,0.6)",
+    color: "rgba(229,231,235,0.6)",
   },
+
   link: {
     cursor: "pointer",
     color: "#00ff9c",
     textDecoration: "underline",
   },
 };
+

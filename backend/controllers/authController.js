@@ -31,8 +31,8 @@ export const register = async (req, res) => {
       username,
       email,
       password: hashedPassword,
-      otp: hashedOtp,
-      otpExpires: Date.now() + 10 * 60 * 1000,
+      otpHash: hashedOtp,
+      otpExpiresAt: new Date(Date.now() + 10 * 60 * 1000),
       isVerified: false,
     });
 
@@ -57,18 +57,22 @@ export const verifyOtp = async (req, res) => {
       return res.status(400).json({ message: "User not found" });
     }
 
-    if (!user.otpExpires || user.otpExpires < Date.now()) {
+    if (!user.otpHash) {
+      return res.status(400).json({ message: "OTP not found" });
+    }
+
+    if (!user.otpExpiresAt || user.otpExpiresAt < Date.now()) {
       return res.status(400).json({ message: "OTP expired" });
     }
 
-    const isValid = await bcrypt.compare(otp, user.otp);
+    const isValid = await bcrypt.compare(otp, user.otpHash);
     if (!isValid) {
       return res.status(400).json({ message: "Invalid OTP" });
     }
 
     user.isVerified = true;
-    user.otp = undefined;
-   // user.otpExpires = undefined;
+    user.otpHash = undefined;
+    user.otpExpiresAt = undefined;
     await user.save();
 
     return res.json({ message: "OTP verified successfully" });
@@ -117,3 +121,4 @@ export const login = async (req, res) => {
     return res.status(500).json({ message: "Login failed" });
   }
 };
+

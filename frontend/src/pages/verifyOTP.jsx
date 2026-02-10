@@ -40,105 +40,82 @@ export default function VerifyOtp() {
   };
 
   return (
-    <div style={styles.page}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>VERIFY ACCESS</h1>
-        <p style={styles.subtitle}>
-          Enter the 6-digit code sent to<br />
-          <strong>{email}</strong>
-        </p>
+    <div
+      className="min-h-screen flex items-center justify-center"
+      style={{
+        background:
+          "radial-gradient(circle at top, rgba(0,255,156,0.04), transparent 60%), #0b141a",
+      }}
+    >
+      {/* Card – same language as Login */}
+      <div className="w-full max-w-md bg-[#111b21] border border-white/10 rounded-2xl shadow-lg px-8 py-10">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-base font-mono tracking-[0.35em] text-[#00ff9c]">
+            VERIFY ACCESS
+          </h1>
+          <p className="text-sm text-gray-400 mt-3 leading-relaxed">
+            Enter the 6-digit code sent to
+            <br />
+            <span className="text-gray-200 font-medium">{email}</span>
+          </p>
+        </div>
 
-        {error && <div style={styles.error}>{error}</div>}
+        {/* Error */}
+        {error && (
+          <div className="mb-6 bg-red-500/10 border border-red-500/20 text-red-300 text-sm px-4 py-3 rounded-lg text-center">
+            {error}
+          </div>
+        )}
 
-        <form onSubmit={handleVerify} style={styles.form}>
+        {/* Form */}
+        <form onSubmit={handleVerify} className="space-y-6">
           <input
             value={otp}
             onChange={(e) => setOtp(e.target.value)}
-            placeholder="OTP CODE"
+            placeholder="••••••"
             maxLength={6}
-            style={styles.input}
+            className="
+              w-full
+              text-center
+              text-lg
+              tracking-[0.35em]
+              bg-[#0b141a]
+              text-gray-100
+              border border-white/15
+              rounded-xl
+              px-4 py-4
+              outline-none
+              transition
+              focus:border-[#00ff9c]
+              focus:ring-1 focus:ring-[#00ff9c]/40
+            "
           />
 
           <button
             type="submit"
             disabled={loading}
-            style={{
-              ...styles.button,
-              opacity: loading ? 0.6 : 1,
-            }}
+            className={`
+              w-full py-3 rounded-xl
+              text-base font-medium tracking-wide
+              transition
+              ${
+                loading
+                  ? "bg-[#00a884]/60 cursor-not-allowed"
+                  : "bg-[#00a884] hover:brightness-110 shadow-[0_0_16px_rgba(0,255,156,0.35)]"
+              }
+              text-black
+            `}
           >
             {loading ? "VERIFYING…" : "VERIFY"}
           </button>
         </form>
+
+        {/* Footer */}
+        <p className="mt-8 text-center text-xs text-gray-500">
+         Resend OTP
+        </p>
       </div>
     </div>
   );
 }
-
-/* ---------- Styles ---------- */
-
-const styles = {
-  page: {
-    minHeight: "100vh",
-    background:
-      "radial-gradient(circle at top, #001b12 0%, #000a06 40%, #000 100%)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontFamily: "'JetBrains Mono', monospace",
-    color: "#00ff9c",
-  },
-  card: {
-    width: 400,
-    padding: 32,
-    background: "rgba(0,15,10,0.85)",
-    borderRadius: 12,
-    border: "1px solid rgba(0,255,156,0.25)",
-    boxShadow: "0 0 30px rgba(0,255,156,0.15)",
-    textAlign: "center",
-  },
-  title: {
-    letterSpacing: 3,
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: "rgba(0,255,156,0.7)",
-    marginBottom: 20,
-  },
-  error: {
-    background: "rgba(255,80,80,0.15)",
-    color: "#ff6b6b",
-    padding: 10,
-    borderRadius: 6,
-    fontSize: 13,
-    marginBottom: 16,
-  },
-  form: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 14,
-  },
-  input: {
-    padding: 14,
-    background: "#000",
-    border: "1px solid rgba(0,255,156,0.35)",
-    borderRadius: 8,
-    color: "#00ff9c",
-    textAlign: "center",
-    fontSize: 18,
-    letterSpacing: 4,
-    outline: "none",
-  },
-  button: {
-    padding: 14,
-    background:
-      "linear-gradient(135deg, #00ff9c 0%, #00cc7a 100%)",
-    border: "none",
-    borderRadius: 8,
-    color: "#001b12",
-    fontWeight: "bold",
-    letterSpacing: 2,
-    cursor: "pointer",
-  },
-};

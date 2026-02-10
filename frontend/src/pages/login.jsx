@@ -29,98 +29,84 @@ export default function Login() {
   };
 
   return (
-    <div style={styles.page}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>SYSTEM LOGIN</h1>
+    <div
+      className="min-h-screen flex items-center justify-center text-gray-200"
+      style={{
+        background:
+          "radial-gradient(circle at top, rgba(0,255,156,0.05), transparent 60%), #0b141a",
+      }}
+    >
+      {/* Card */}
+      <div className="w-full max-w-md bg-[#111b21] rounded-2xl border border-white/10 shadow-[0_0_40px_rgba(0,255,156,0.15)] p-8 relative">
+        {/* Subtle scanline */}
+        <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(0,255,156,0.03)_1px,transparent_1px)] bg-[length:100%_3px] opacity-10 rounded-2xl" />
 
-        {error && <div style={styles.error}>{error}</div>}
+        {/* Header */}
+        <div className="relative mb-8 text-center">
+          <h1 className="text-lg font-mono tracking-[0.35em] text-[#00ff9c]">
+            CR MATRIX
+          </h1>
+          <p className="text-sm text-gray-400 mt-2">
+            Secure system access
+          </p>
+        </div>
 
-        <form onSubmit={handleLogin} style={styles.form}>
-          <input
-            placeholder="EMAIL"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={styles.input}
-          />
-          <input
-            placeholder="PASSWORD"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={styles.input}
-          />
+        {/* Error */}
+        {error && (
+          <div className="mb-5 bg-red-500/10 border border-red-500/20 text-red-300 text-sm px-4 py-3 rounded-lg text-center">
+            {error}
+          </div>
+        )}
+
+        {/* Form */}
+        <form onSubmit={handleLogin} className="space-y-5 relative">
+          <div>
+            <label className="block text-xs font-mono tracking-widest text-gray-400 mb-2">
+              EMAIL
+            </label>
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-[#0b141a] border border-white/10 rounded-lg px-4 py-3 text-base outline-none
+                         focus:border-[#00ff9c] focus:ring-1 focus:ring-[#00ff9c]/40"
+              placeholder="you@example.com"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-mono tracking-widest text-gray-400 mb-2">
+              PASSWORD
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-[#0b141a] border border-white/10 rounded-lg px-4 py-3 text-base outline-none
+                         focus:border-[#00ff9c] focus:ring-1 focus:ring-[#00ff9c]/40"
+              placeholder="••••••••"
+            />
+          </div>
 
           <button
             type="submit"
             disabled={loading}
-            style={{
-              ...styles.button,
-              opacity: loading ? 0.6 : 1,
-            }}
+            className={`w-full mt-2 py-3 rounded-lg text-base font-medium tracking-wide transition
+              ${
+                loading
+                  ? "bg-[#00a884]/70 cursor-not-allowed"
+                  : "bg-[#00a884] hover:brightness-110 shadow-[0_0_16px_rgba(0,255,156,0.35)]"
+              }
+              text-black`}
           >
             {loading ? "AUTHORIZING…" : "LOGIN"}
           </button>
         </form>
+
+        {/* Footer */}
+        <p className="relative text-center text-xs text-gray-500 mt-8">
+          Encrypted • Authenticated • Secure
+        </p>
       </div>
     </div>
   );
 }
-
-const styles = {
-  page: {
-    minHeight: "100vh",
-    background:
-      "radial-gradient(circle at top, #001b12 0%, #000a06 40%, #000 100%)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontFamily: "'JetBrains Mono', monospace",
-    color: "#00ff9c",
-  },
-  card: {
-    width: 400,
-    padding: 32,
-    background: "rgba(0,15,10,0.85)",
-    borderRadius: 12,
-    border: "1px solid rgba(0,255,156,0.25)",
-    boxShadow: "0 0 30px rgba(0,255,156,0.15)",
-  },
-  title: {
-    textAlign: "center",
-    letterSpacing: 3,
-    marginBottom: 20,
-  },
-  error: {
-    background: "rgba(255,80,80,0.15)",
-    color: "#ff6b6b",
-    padding: 10,
-    borderRadius: 6,
-    fontSize: 13,
-    marginBottom: 16,
-    textAlign: "center",
-  },
-  form: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 14,
-  },
-  input: {
-    padding: 12,
-    background: "#000",
-    border: "1px solid rgba(0,255,156,0.35)",
-    borderRadius: 8,
-    color: "#00ff9c",
-    outline: "none",
-  },
-  button: {
-    padding: 14,
-    background:
-      "linear-gradient(135deg, #00ff9c 0%, #00cc7a 100%)",
-    border: "none",
-    borderRadius: 8,
-    color: "#001b12",
-    fontWeight: "bold",
-    letterSpacing: 2,
-    cursor: "pointer",
-  },
-};
