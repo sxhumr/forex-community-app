@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import User from "../models/user.js";
+import Message from "../models/message.js";
 
 export const setupSocket = (io) => {
   // 🔐 Socket authentication middleware
@@ -38,18 +39,84 @@ export const setupSocket = (io) => {
   io.on("connection", (socket) => {
     console.log(`🟢 ${socket.user.username} connected`);
 
-    socket.on("sendMessage", ({ text }) => {
-      if (!text) return;
+    socket.on("sendMessage", async ({ text, room = "general" }) => {
+      try {
+        if (!text?.trim()) return;
 
-      const message = {
-        text,
-        username: socket.user.username,
-        role: socket.user.role,
-        createdAt: new Date(),
-      };
+        const safeRoom = room === "feeds" ? "feeds" : "general";
 
-      // Broadcast to all clients
-      io.emit("newMessage", message);
+        const saved = await Message.create({
+          text: text.trim(),
+          room: safeRoom,
+          username: socket.user.username,
+          role: socket.user.role,
+          user: socket.user._id,
+        });
+
+        io.emit("newMessage", {
+          _id: saved._id,
+          text: saved.text,
+          room: saved.room,
+          username: saved.username,
+          role: saved.role,
+          isEdited: saved.isEdited,
+          createdAt: saved.createdAt,
+        });
+      } catch (err) {
+        console.error("Send message error:", err.message);
+      }
+    });
+
+    socket.on("editMessage", async ({ id, text }) => {
+      try {
+        if (!id || !text?.trim()) return;
+
+        const message = await Message.findById(id);
+        if (!message) return;
+
+        const canEdit =
+          message.user.toString() === socket.user._id.toString() ||
+          socket.user.role === "admin";
+
+        if (!canEdit) return;
+
+        message.text = text.trim();
+        message.isEdited = true;
+        await message.save();
+
+        io.emit("messageEdited", {
+          _id: message._id,
+          text: message.text,
+          room: message.room,
+          isEdited: message.isEdited,
+        });
+      } catch (err) {
+        console.error("Edit message error:", err.message);
+      }
+    });
+
+    socket.on("deleteMessage", async ({ id }) => {
+      try {
+        if (!id) return;
+
+        const message = await Message.findById(id);
+        if (!message) return;
+
+        const canDelete =
+          message.user.toString() === socket.user._id.toString() ||
+          socket.user.role === "admin";
+
+        if (!canDelete) return;
+
+        await Message.findByIdAndDelete(id);
+
+        io.emit("messageDeleted", {
+          _id: id,
+          room: message.room,
+        });
+      } catch (err) {
+        console.error("Delete message error:", err.message);
+      }
     });
 
     socket.on("disconnect", () => {

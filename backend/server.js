@@ -7,6 +7,7 @@ import { Server } from "socket.io";
 
 // Routes
 import authRoutes from "./routes/authRoutes.js";
+import messageRoutes from "./routes/messageRoutes.js";
 
 // Socket setup
 import { setupSocket } from "./socket/socket.js";
@@ -37,6 +38,7 @@ app.use(express.json());
 // Routes
 // --------------------
 app.use("/api/auth", authRoutes);
+app.use("/api/messages", messageRoutes);
 
 app.get("/", (req, res) => {
   res.send("Forex backend running 🚀");
