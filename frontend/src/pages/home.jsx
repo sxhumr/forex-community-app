@@ -3,11 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
 import api from "../services/api";
 
-const socket = io("http://localhost:5000", {
-  auth: {
-    token: localStorage.getItem("token"),
-  },
-});
+const socket = io(import.meta.env.VITE_API_URL, { auth: { token: localStorage.getItem("token"), }, });
 
 export default function Home() {
   const navigate = useNavigate();
