@@ -4,11 +4,11 @@ import { io } from "socket.io-client";
 import Message from "../components/message";
 import api from "../services/api";
 
-const socket = io("https://forex-community-app.onrender.com", {
-  auth: {
-    token: localStorage.getItem("token"),
-  },
-});
+const SOCKET_URL =
+  import.meta.env.VITE_SOCKET_URL ||
+  (typeof window !== "undefined" && window.location.hostname === "localhost"
+    ? "http://localhost:5000"
+    : "https://forex-community-app.onrender.com");
 
 const MAX_MEDIA_SIZE_BYTES = 10 * 1024 * 1024;
 const ACCEPTED_MEDIA_TYPES = [
@@ -32,6 +32,7 @@ const fileToDataUrl = (file) =>
 export default function Home() {
   const navigate = useNavigate();
   const messagesEndRef = useRef(null);
+  const socketRef = useRef(null);
 
   const [messages, setMessages] = useState({
     general: [],
@@ -62,6 +63,18 @@ export default function Home() {
 
   /* SOCKET LISTENERS */
   useEffect(() => {
+    if (!token) {
+      navigate("/login");
+      return undefined;
+    }
+
+    const socket = io(SOCKET_URL, {
+      auth: { token },
+      transports: ["websocket", "polling"],
+    });
+
+    socketRef.current = socket;
+
     socket.on("newMessage", (message) => {
       const room = message.room || "general";
       setMessages((prev) => ({
@@ -93,7 +106,6 @@ export default function Home() {
     socket.on("connect_error", (err) => {
       console.error("Socket error:", err.message);
 
-      // Token invalid / expired
       if (err.message.includes("Authentication")) {
         localStorage.clear();
         navigate("/login");
@@ -105,8 +117,10 @@ export default function Home() {
       socket.off("messageEdited");
       socket.off("messageDeleted");
       socket.off("connect_error");
+      socket.disconnect();
+      socketRef.current = null;
     };
-  }, [navigate]);
+  }, [navigate, token]);
 
   useEffect(() => {
     const loadMessages = async () => {
@@ -166,7 +180,12 @@ export default function Home() {
   const handleSend = () => {
     if (!newMessage.trim() && !pendingMedia) return;
 
-    socket.emit("sendMessage", {
+    if (!socketRef.current) {
+      console.error("Socket not connected yet");
+      return;
+    }
+
+    socketRef.current.emit("sendMessage", {
       text: newMessage.trim(),
       room: activeRoom,
       media: pendingMedia,
@@ -187,9 +206,9 @@ export default function Home() {
   };
 
   const saveEdit = () => {
-    if (!editedText.trim()) return;
+    if (!editedText.trim() || !socketRef.current) return;
 
-    socket.emit("editMessage", {
+    socketRef.current.emit("editMessage", {
       id: editingId,
       text: editedText.trim(),
     });
@@ -198,12 +217,13 @@ export default function Home() {
   };
 
   const deleteMessage = (id) => {
-    socket.emit("deleteMessage", { id });
+    if (!socketRef.current) return;
+    socketRef.current.emit("deleteMessage", { id });
   };
 
   const handleLogout = () => {
     localStorage.clear();
-    socket.disconnect();
+    socketRef.current?.disconnect();
     navigate("/login");
   };
 
@@ -372,7 +392,7 @@ export default function Home() {
 
               <div className="flex gap-3">
                 <label className="px-4 py-2 border border-white/20 text-green-100 rounded-md hover:border-white/40 transition cursor-pointer whitespace-nowrap">
-                  Upload
+                  📎
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
