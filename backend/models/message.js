@@ -9,8 +9,8 @@ const messageSchema = new mongoose.Schema(
     },
     text: {
       type: String,
-      required: true,
       trim: true,
+      default: "",
     },
     username: {
       type: String,
@@ -30,9 +30,38 @@ const messageSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    media: {
+      type: {
+        type: String,
+        enum: ["image", "video"],
+      },
+      mimeType: {
+        type: String,
+      },
+      dataUrl: {
+        type: String,
+      },
+      fileName: {
+        type: String,
+      },
+      size: {
+        type: Number,
+      },
+    },
   },
   { timestamps: true }
 );
+
+messageSchema.pre("validate", function (next) {
+  const hasText = typeof this.text === "string" && this.text.trim().length > 0;
+  const hasMedia = Boolean(this.media?.dataUrl);
+
+  if (!hasText && !hasMedia) {
+    return next(new Error("Message must contain text or media"));
+  }
+
+  next();
+});
 
 const Message =
   mongoose.models.Message || mongoose.model("Message", messageSchema);
