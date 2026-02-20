@@ -60,8 +60,8 @@ app.use(express.json());
 // --------------------
 // Routes
 // --------------------
-app.use("/api/auth", authRoutes);
-app.use("/api/messages", messageRoutes);
+app.use("/auth", authRoutes);
+app.use("/messages", messageRoutes);
 
 app.get("/", (req, res) => {
   res.send("Forex backend running 🚀");
