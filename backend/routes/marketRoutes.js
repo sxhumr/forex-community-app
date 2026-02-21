@@ -1,27 +1,29 @@
-// routes/marketRoutes.js
 import express from "express";
 import axios from "axios";
 
 const router = express.Router();
 
-router.get("/forex/:pair", async (req, res) => {
+// Example: EUR/USD 1min data
+router.get("/pair/:symbol", async (req, res) => {
   try {
-    const { pair } = req.params;
+    const { symbol } = req.params;
 
     const response = await axios.get(
       `https://api.twelvedata.com/time_series`,
       {
         params: {
-          symbol: pair,
+          symbol,
           interval: "1min",
+          outputsize: 50,
           apikey: process.env.FOREX_API_KEY,
         },
       }
     );
 
-    res.json(response.data);
+    return res.json(response.data);
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch market data" });
+    console.error("Market API error:", err.message);
+    return res.status(500).json({ message: "Market data failed" });
   }
 });
 

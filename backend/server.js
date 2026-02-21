@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import cors from "cors";
 import { Server } from "socket.io";
+import marketRoutes from "./routes/marketRoutes.js";
 
 // Routes
 import authRoutes from "./routes/authRoutes.js";
@@ -63,6 +64,7 @@ app.use(express.json());
 // --------------------
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/market", marketRoutes);
 
 // Health check route
 app.get("/", (req, res) => {
