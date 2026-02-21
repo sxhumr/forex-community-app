@@ -24,7 +24,7 @@ const app = express();
 const server = http.createServer(app);
 
 // --------------------
-// Middleware
+// CORS Configuration
 // --------------------
 const configuredOrigins = (process.env.FRONTEND_URL || "")
   .split(",")
@@ -52,17 +52,19 @@ const corsOrigin = (origin, callback) => {
 app.use(
   cors({
     origin: corsOrigin,
+    credentials: true,
   })
 );
 
 app.use(express.json());
 
 // --------------------
-// Routes
+// Routes (API Namespace)
 // --------------------
-app.use("/auth", authRoutes);
-app.use("/messages", messageRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/messages", messageRoutes);
 
+// Health check route
 app.get("/", (req, res) => {
   res.send("Forex backend running 🚀");
 });
