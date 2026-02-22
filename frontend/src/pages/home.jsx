@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
 import Message from "../components/message";
 import api from "../services/api";
+import MarketFeed from "../components/marketFeed";
 
 const SOCKET_URL =
   import.meta.env.VITE_SOCKET_URL ||
@@ -213,6 +214,9 @@ export default function Home() {
           </span>
         </div>
 
+
+        <div className="flex-1 flex flex-col overflow hidden"> 
+                {activeRoom === "feeds"&& <MarketFeed />}
         <div className="flex-1 p-6 space-y-4 overflow-y-auto bg-gradient-to-b from-[#111827] to-[#0c1422]">
           {messages[activeRoom].map((msg) => {
             const isOwn =
@@ -235,6 +239,7 @@ export default function Home() {
             );
           })}
           <div ref={messagesEndRef} />
+        </div>
         </div>
 
         <div className="border-t border-white/10 bg-[#0d1320] p-4">
