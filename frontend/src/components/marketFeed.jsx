@@ -1,111 +1,115 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
+import {
+  ResponsiveContainer,
+  ComposedChart,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  Bar
+} from "recharts";
 import api from "../services/api";
 
 export default function MarketFeed() {
-  const [data, setData] = useState(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [marketState, setMarketState] = useState({
+    data: [],
+    loading: true,
+    error: "",
+  });
 
-  const fetchMarket = useCallback(async () => {
-    try {
-      const response = await api.get(
-        "/market/pair?symbol=EUR/USD"
-      );
-
-      setData(response.data);
-      setError("");
-      setLoading(false);
-    } catch (err) {
-      console.error("Market fetch error:", err);
-      setError("Failed to load market data");
-      setLoading(false);
-    }
-  }, []);
+  const previousCloseRef = useRef(null);
 
   useEffect(() => {
-    let isMounted = true;
+    let interval;
 
-    const load = async () => {
-      if (!isMounted) return;
-      await fetchMarket();
+    const fetchMarket = async () => {
+      try {
+        const response = await api.get(
+          "/market/pair?symbol=EUR/USD"
+        );
+
+        if (!response.data?.values?.length) {
+          setMarketState({
+            data: [],
+            loading: false,
+            error: "No market data available",
+          });
+          return;
+        }
+
+        const formatted = response.data.values
+          .slice()
+          .reverse()
+          .map((candle) => ({
+            time: candle.datetime.slice(11, 16),
+            open: parseFloat(candle.open),
+            high: parseFloat(candle.high),
+            low: parseFloat(candle.low),
+            close: parseFloat(candle.close),
+          }));
+
+        previousCloseRef.current =
+          formatted[formatted.length - 1].close;
+
+        setMarketState({
+          data: formatted,
+          loading: false,
+          error: "",
+        });
+      } catch (err) {
+        console.error("Market fetch error:", err);
+        setMarketState({
+          data: [],
+          loading: false,
+          error: "Failed to load market data",
+        });
+      }
     };
 
-    load();
+    fetchMarket();
+    interval = setInterval(fetchMarket, 30000);
 
-    const interval = setInterval(() => {
-      fetchMarket();
-    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, [fetchMarket]);
+  const { data, loading, error } = marketState;
 
   if (loading) {
-    return (
-      <div className="p-4 text-green-300">
-        Loading market data...
-      </div>
-    );
+    return <div className="p-4 text-green-300">Loading chart...</div>;
   }
 
   if (error) {
-    return (
-      <div className="p-4 text-red-400">
-        {error}
-      </div>
-    );
+    return <div className="p-4 text-red-400">{error}</div>;
   }
-
-  if (!data || !data.values || !data.values.length) {
-    return (
-      <div className="p-4 text-yellow-400">
-        No market data available
-      </div>
-    );
-  }
-
-  const latest = data.values[0];
 
   return (
     <div className="bg-[#0f172a] border-b border-white/10 p-4">
-      <div className="flex justify-between items-center mb-3">
-        <h2 className="text-green-300 font-semibold">
-          EUR/USD — Live Market
-        </h2>
-        <span className="text-xs text-green-400/70">
-          {latest.datetime}
-        </span>
-      </div>
+      <h2 className="text-green-300 font-semibold mb-4">
+        EUR/USD — Live Candlestick Chart
+      </h2>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-        <div>
-          <p className="text-green-400/60">Open</p>
-          <p>{latest.open}</p>
-        </div>
+      <div className="h-64 w-full">
+        <ResponsiveContainer>
+          <ComposedChart data={data}>
+            <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" />
+            <XAxis dataKey="time" stroke="#9ca3af" />
+            <YAxis
+              domain={["dataMin", "dataMax"]}
+              stroke="#9ca3af"
+            />
+            <Tooltip />
 
-        <div>
-          <p className="text-green-400/60">High</p>
-          <p>{latest.high}</p>
-        </div>
-
-        <div>
-          <p className="text-green-400/60">Low</p>
-          <p>{latest.low}</p>
-        </div>
-
-        <div>
-          <p className="text-green-400/60">Close</p>
-          <p className="text-green-200 font-semibold">
-            {latest.close}
-          </p>
-        </div>
-
-        <div>
-          <p className="text-green-400/60">Volume</p>
-          <p>{latest.volume}</p>
-        </div>
+            {data.map((entry, index) => {
+              const isUp = entry.close >= entry.open;
+              return (
+                <Bar
+                  key={index}
+                  dataKey="close"
+                  fill={isUp ? "#22c55e" : "#ef4444"}
+                />)
+            })}
+          </ComposedChart>
+        </ResponsiveContainer>
       </div>
     </div>
   );

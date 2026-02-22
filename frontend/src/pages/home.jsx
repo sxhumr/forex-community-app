@@ -24,9 +24,7 @@ export default function Home() {
   const [newMessage, setNewMessage] = useState("");
   const [activeRoom, setActiveRoom] = useState("general");
 
-  // 🔐 Always read fresh token
   const getToken = () => localStorage.getItem("token");
-
   const token = getToken();
 
   const currentUserId = (() => {
@@ -61,19 +59,6 @@ export default function Home() {
     });
 
     socketRef.current = socket;
-
-    socket.on("connect", () => {
-      console.log("🟢 Socket connected:", socket.id);
-    });
-
-    socket.on("disconnect", () => {
-      console.log("🔴 Socket disconnected");
-    });
-
-    socket.on("connect_error", (err) => {
-      console.error("Socket error:", err.message);
-      // 🚫 DO NOT clear token automatically
-    });
 
     socket.on("newMessage", (message) => {
       const room = message.room || "general";
@@ -161,9 +146,6 @@ export default function Home() {
           <h2 className="text-[#80f7c7] text-sm tracking-[0.25em]">
             CR MATRIX
           </h2>
-          <p className="text-xs text-green-200/60 mt-2">
-            Secure Trading Signal Hub
-          </p>
         </div>
 
         <div className="flex-1 p-4 space-y-3 text-sm">
@@ -193,7 +175,7 @@ export default function Home() {
         <div className="p-4 border-t border-white/10">
           <button
             onClick={handleLogout}
-            className="w-full text-left text-sm text-red-400 hover:text-red-300 transition"
+            className="w-full text-left text-sm text-red-400 hover:text-red-300"
           >
             Logout
           </button>
@@ -214,32 +196,29 @@ export default function Home() {
           </span>
         </div>
 
+        <div className="flex-1 flex flex-col overflow-hidden">
 
-        <div className="flex-1 flex flex-col overflow hidden"> 
-                {activeRoom === "feeds"&& <MarketFeed />}
-        <div className="flex-1 p-6 space-y-4 overflow-y-auto bg-gradient-to-b from-[#111827] to-[#0c1422]">
-          {messages[activeRoom].map((msg) => {
-            const isOwn =
-              String(msg.user || "") === String(currentUserId || "");
+          {activeRoom === "feeds" && <MarketFeed />}
 
-            return (
-              <div key={msg._id} className="group">
-                <div className={`flex ${isOwn ? "justify-end" : "justify-start"}`}>
-                  <div className="w-full max-w-[85%]">
-                    <Message
-                      user={msg.username || "User"}
-                      role={msg.role}
-                      text={msg.text}
-                      media={msg.media}
-                      isOwn={isOwn}
-                    />
-                  </div>
+          <div className="flex-1 p-6 space-y-4 overflow-y-auto bg-gradient-to-b from-[#111827] to-[#0c1422]">
+            {messages[activeRoom].map((msg) => {
+              const isOwn =
+                String(msg.user || "") === String(currentUserId || "");
+
+              return (
+                <div key={msg._id}>
+                  <Message
+                    user={msg.username || "User"}
+                    role={msg.role}
+                    text={msg.text}
+                    media={msg.media}
+                    isOwn={isOwn}
+                  />
                 </div>
-              </div>
-            );
-          })}
-          <div ref={messagesEndRef} />
-        </div>
+              );
+            })}
+            <div ref={messagesEndRef} />
+          </div>
         </div>
 
         <div className="border-t border-white/10 bg-[#0d1320] p-4">
@@ -259,7 +238,7 @@ export default function Home() {
 
             <button
               onClick={handleSend}
-              className="px-5 py-2 bg-purple-500/90 text-white rounded-md hover:bg-purple-400 transition font-medium"
+              className="px-5 py-2 bg-purple-500/90 text-white rounded-md hover:bg-purple-400"
             >
               Send
             </button>

@@ -3,7 +3,7 @@ import axios from "axios";
 
 const router = express.Router();
 
-// Example: EUR/USD 1min data
+// Example: EURUSD 1min data
 router.get("/pair/:symbol", async (req, res) => {
   try {
     const { symbol } = req.params;
@@ -25,6 +25,10 @@ router.get("/pair/:symbol", async (req, res) => {
     console.error("Market API error:", err.message);
     return res.status(500).json({ message: "Market data failed" });
   }
+});
+
+router.get("/test", (req, res) => {
+  res.json({ message: "Market route working" });
 });
 
 export default router;
