@@ -3,13 +3,12 @@ import axios from "axios";
 
 const router = express.Router();
 
-// Example: EURUSD 1min data
-router.get("/pair/:symbol", async (req, res) => {
+router.get("/pair", async (req, res) => {
   try {
-    const { symbol } = req.params;
+    const { symbol = "EUR/USD" } = req.query;
 
     const response = await axios.get(
-      `https://api.twelvedata.com/time_series`,
+      "https://api.twelvedata.com/time_series",
       {
         params: {
           symbol,
@@ -20,10 +19,10 @@ router.get("/pair/:symbol", async (req, res) => {
       }
     );
 
-    return res.json(response.data);
+    res.json(response.data);
   } catch (err) {
     console.error("Market API error:", err.message);
-    return res.status(500).json({ message: "Market data failed" });
+    res.status(500).json({ message: "Market data failed" });
   }
 });
 

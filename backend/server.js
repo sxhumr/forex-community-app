@@ -78,7 +78,9 @@ const io = new Server(server, {
   cors: {
     origin: corsOrigin,
     methods: ["GET", "POST"],
+    credentials: true,
   },
+  transports: ["polling"],
 });
 
 setupSocket(io);
