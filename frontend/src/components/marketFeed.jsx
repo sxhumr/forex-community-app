@@ -1,39 +1,70 @@
-import { useEffect, useState, useRef } from "react";
-import {
-  ResponsiveContainer,
-  ComposedChart,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  Bar
-} from "recharts";
+import { useEffect, useRef, useState } from "react";
+import { createChart } from "lightweight-charts";
 import api from "../services/api";
 
 export default function MarketFeed() {
-  const [marketState, setMarketState] = useState({
-    data: [],
-    loading: true,
-    error: "",
-  });
+  const chartContainerRef = useRef(null);
+  const chartRef = useRef(null);
+  const candleSeriesRef = useRef(null);
 
-  const previousCloseRef = useRef(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!chartContainerRef.current) return;
+
+    const chart = createChart(chartContainerRef.current, {
+      layout: {
+        background: { color: "#0f172a" },
+        textColor: "#cbd5f5",
+      },
+      grid: {
+        vertLines: { color: "#1f2937" },
+        horzLines: { color: "#1f2937" },
+      },
+      width: chartContainerRef.current.clientWidth,
+      height: 300,
+      timeScale: {
+        timeVisible: true,
+        secondsVisible: false,
+      },
+    });
+
+    const candleSeries = chart.addCandlestickSeries({
+      upColor: "#22c55e",
+      downColor: "#ef4444",
+      borderVisible: false,
+      wickUpColor: "#22c55e",
+      wickDownColor: "#ef4444",
+    });
+
+    chartRef.current = chart;
+    candleSeriesRef.current = candleSeries;
+
+    const handleResize = () => {
+      chart.applyOptions({
+        width: chartContainerRef.current.clientWidth,
+      });
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      chart.remove();
+    };
+  }, []);
 
   useEffect(() => {
     let interval;
 
     const fetchMarket = async () => {
       try {
-        const response = await api.get(
-          "/market/pair?symbol=EUR/USD"
-        );
+        const response = await api.get("/market/pair?symbol=EUR/USD");
 
-        if (!response.data?.values?.length) {
-          setMarketState({
-            data: [],
-            loading: false,
-            error: "No market data available",
-          });
+        if (!response.data?.values) {
+          setError("No market data available");
+          setLoading(false);
           return;
         }
 
@@ -41,28 +72,21 @@ export default function MarketFeed() {
           .slice()
           .reverse()
           .map((candle) => ({
-            time: candle.datetime.slice(11, 16),
+            time: candle.datetime,
             open: parseFloat(candle.open),
             high: parseFloat(candle.high),
             low: parseFloat(candle.low),
             close: parseFloat(candle.close),
           }));
 
-        previousCloseRef.current =
-          formatted[formatted.length - 1].close;
+        candleSeriesRef.current.setData(formatted);
 
-        setMarketState({
-          data: formatted,
-          loading: false,
-          error: "",
-        });
+        setLoading(false);
+        setError("");
       } catch (err) {
         console.error("Market fetch error:", err);
-        setMarketState({
-          data: [],
-          loading: false,
-          error: "Failed to load market data",
-        });
+        setError("Failed to load market data");
+        setLoading(false);
       }
     };
 
@@ -72,45 +96,32 @@ export default function MarketFeed() {
     return () => clearInterval(interval);
   }, []);
 
-  const { data, loading, error } = marketState;
-
   if (loading) {
-    return <div className="p-4 text-green-300">Loading chart...</div>;
+    return (
+      <div className="p-4 text-green-300">
+        Loading market data...
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="p-4 text-red-400">{error}</div>;
+    return (
+      <div className="p-4 text-red-400">
+        {error}
+      </div>
+    );
   }
 
   return (
     <div className="bg-[#0f172a] border-b border-white/10 p-4">
       <h2 className="text-green-300 font-semibold mb-4">
-        EUR/USD — Live Candlestick Chart
+        EUR/USD — Live Market Chart
       </h2>
 
-      <div className="h-64 w-full">
-        <ResponsiveContainer>
-          <ComposedChart data={data}>
-            <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" />
-            <XAxis dataKey="time" stroke="#9ca3af" />
-            <YAxis
-              domain={["dataMin", "dataMax"]}
-              stroke="#9ca3af"
-            />
-            <Tooltip />
-
-            {data.map((entry, index) => {
-              const isUp = entry.close >= entry.open;
-              return (
-                <Bar
-                  key={index}
-                  dataKey="close"
-                  fill={isUp ? "#22c55e" : "#ef4444"}
-                />)
-            })}
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
+      <div
+        ref={chartContainerRef}
+        className="w-full h-[300px]"
+      />
     </div>
   );
 }

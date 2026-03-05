@@ -2,9 +2,29 @@ import jwt from "jsonwebtoken";
 import User from "../models/user.js";
 import Message from "../models/message.js";
 
-const MAX_MEDIA_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
-const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
-const VIDEO_TYPES = new Set(["video/mp4", "video/webm", "video/quicktime"]);
+const MAX_MEDIA_SIZE_BYTES = 10 * 1024 * 1024;
+
+const IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+]);
+
+const VIDEO_TYPES = new Set([
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+]);
+
+const VALID_ROOMS = [
+  "general-chat",
+  "market-analysis",
+  "private-team-updates",
+  "live-signals",
+  "one-on-one-request",
+  "full-trading-course",
+];
 
 const sanitizeMedia = (media) => {
   if (!media) return null;
@@ -18,24 +38,24 @@ const sanitizeMedia = (media) => {
 
   if (!isImage && !isVideo) return null;
 
-  if (typeof dataUrl !== "string" || !dataUrl.startsWith(`data:${mimeType};base64,`)) {
-    return null;
-  }
+  if (!dataUrl.startsWith(`data:${mimeType};base64,`)) return null;
 
-  const parsedSize = Number(size || 0);
-  if (!parsedSize || parsedSize > MAX_MEDIA_SIZE_BYTES) return null;
+  if (!size || size > MAX_MEDIA_SIZE_BYTES) return null;
 
   return {
     type,
     mimeType,
     dataUrl,
-    fileName: typeof fileName === "string" ? fileName.slice(0, 120) : undefined,
-    size: parsedSize,
+    fileName,
+    size,
   };
 };
 
 export const setupSocket = (io) => {
-  // 🔐 Socket authentication middleware
+
+  /* ============================
+     AUTH MIDDLEWARE
+  ============================ */
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth?.token;
@@ -50,16 +70,13 @@ export const setupSocket = (io) => {
         "_id username role isVerified"
       );
 
-      if (!user) {
-        return next(new Error("User not found"));
-      }
+      if (!user) return next(new Error("User not found"));
 
-      if (!user.isVerified) {
+      if (!user.isVerified)
         return next(new Error("User not verified"));
-      }
 
-      // ✅ Trusted identity attached to socket
       socket.user = user;
+
       next();
     } catch (err) {
       console.error("Socket auth error:", err.message);
@@ -67,18 +84,31 @@ export const setupSocket = (io) => {
     }
   });
 
-  // 🔌 Socket events
+  /* ============================
+     CONNECTION
+  ============================ */
   io.on("connection", (socket) => {
     console.log(`🟢 ${socket.user.username} connected`);
 
-    socket.on("sendMessage", async ({ text, room = "general", media }) => {
+    /* ============================
+       SEND MESSAGE
+    ============================ */
+    socket.on("sendMessage", async ({ text, room, media }) => {
       try {
         const safeText = typeof text === "string" ? text.trim() : "";
-        const safeMedia = sanitizeMedia(media);
+
+        let safeMedia = null;
+
+        /* Only Robert can upload media */
+        if (media && socket.user.username === "robert") {
+          safeMedia = sanitizeMedia(media);
+        }
 
         if (!safeText && !safeMedia) return;
 
-        const safeRoom = room === "feeds" ? "feeds" : "general";
+        const safeRoom = VALID_ROOMS.includes(room)
+          ? room
+          : "general-chat";
 
         const saved = await Message.create({
           text: safeText,
@@ -105,6 +135,9 @@ export const setupSocket = (io) => {
       }
     });
 
+    /* ============================
+       EDIT MESSAGE
+    ============================ */
     socket.on("editMessage", async ({ id, text }) => {
       try {
         if (!id || !text?.trim()) return;
@@ -120,23 +153,25 @@ export const setupSocket = (io) => {
 
         message.text = text.trim();
         message.isEdited = true;
+
         await message.save();
 
         io.emit("messageEdited", {
           _id: message._id,
           text: message.text,
           room: message.room,
-          isEdited: message.isEdited,
+          isEdited: true,
         });
       } catch (err) {
         console.error("Edit message error:", err.message);
       }
     });
 
+    /* ============================
+       DELETE MESSAGE
+    ============================ */
     socket.on("deleteMessage", async ({ id }) => {
       try {
-        if (!id) return;
-
         const message = await Message.findById(id);
         if (!message) return;
 
