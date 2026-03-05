@@ -60,7 +60,7 @@ export default function MarketFeed() {
 
     const fetchMarket = async () => {
       try {
-        const response = await api.get("/market/pair?symbol=EUR/USD");
+        const response = await api.get("/market/pair?symbol=EURUSD");
 
         if (!response.data?.values) {
           setError("No market data available");
