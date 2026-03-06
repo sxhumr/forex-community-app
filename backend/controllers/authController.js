@@ -57,18 +57,13 @@ export const verifyOtp = async (req, res) => {
       return res.status(400).json({ message: "User not found" });
     }
 
-    if (!user.otpHash) {
-      return res.status(400).json({ message: "OTP not found" });
-    }
-
+    if (!user.otpHash) return res.status(400).json({ message: "OTP not found" });
     if (!user.otpExpiresAt || user.otpExpiresAt < Date.now()) {
       return res.status(400).json({ message: "OTP expired" });
     }
 
     const isValid = await bcrypt.compare(otp, user.otpHash);
-    if (!isValid) {
-      return res.status(400).json({ message: "Invalid OTP" });
-    }
+    if (!isValid) return res.status(400).json({ message: "Invalid OTP" });
 
     user.isVerified = true;
     user.otpHash = undefined;
@@ -99,9 +94,7 @@ export const login = async (req, res) => {
     }
 
     if (!user.isVerified) {
-      return res
-        .status(403)
-        .json({ message: "Please verify your account first" });
+      return res.status(403).json({ message: "Please verify your account first" });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
@@ -109,8 +102,13 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
+    // FIXED: Added username and role to the JWT Payload
     const token = jwt.sign(
-      { userId: user._id },
+      { 
+        userId: user._id,
+        username: user.username,
+        role: user.role
+      },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );

@@ -4,12 +4,16 @@ import api from "../services/api";
 
 export default function MarketFeed() {
   const chartContainerRef = useRef(null);
-  const chartRef = useRef(null);
+  // eslint-disable-next-line no-unused-vars
+  const chartRef = useRef(null); 
   const candleSeriesRef = useRef(null);
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
+  /* -------------------------------
+     1. Initialize Chart Canvas
+  --------------------------------*/
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
@@ -38,6 +42,7 @@ export default function MarketFeed() {
       wickDownColor: "#ef4444",
     });
 
+    // Store references for the data-fetching effect
     chartRef.current = chart;
     candleSeriesRef.current = candleSeries;
 
@@ -55,15 +60,22 @@ export default function MarketFeed() {
     };
   }, []);
 
+  /* -------------------------------
+     2. Fetch & Map Market Data
+  --------------------------------*/
   useEffect(() => {
     let interval;
 
     const fetchMarket = async () => {
+      // Don't fetch if the chart hasn't initialized its series yet
+      if (!candleSeriesRef.current) return;
+
       try {
+        // Ensure your backend marketController is active
         const response = await api.get("/market/pair?symbol=EURUSD");
 
         if (!response.data?.values) {
-          setError("No market data available");
+          setError("No market data available from TwelveData");
           setLoading(false);
           return;
         }
@@ -72,55 +84,72 @@ export default function MarketFeed() {
           .slice()
           .reverse()
           .map((candle) => ({
-            time: candle.datetime,
+            // CRITICAL: Lightweight Charts needs Unix Seconds (number), 
+            // TwelveData sends Date strings.
+            time: Math.floor(new Date(candle.datetime).getTime() / 1000),
             open: parseFloat(candle.open),
             high: parseFloat(candle.high),
             low: parseFloat(candle.low),
             close: parseFloat(candle.close),
           }));
 
+        // Push data to the chart
         candleSeriesRef.current.setData(formatted);
 
         setLoading(false);
         setError("");
       } catch (err) {
         console.error("Market fetch error:", err);
-        setError("Failed to load market data");
+        setError("Failed to connect to market data stream");
         setLoading(false);
       }
     };
 
     fetchMarket();
+    
+    // Refresh every 30s (Stay under TwelveData 8 req/min limit)
     interval = setInterval(fetchMarket, 30000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, []); 
 
+  /* -------------------------------
+     3. Conditional Rendering
+  --------------------------------*/
   if (loading) {
     return (
-      <div className="p-4 text-green-300">
-        Loading market data...
+      <div className="p-8 text-center bg-[#0f172a] border-b border-white/10">
+        <div className="animate-pulse text-green-400 font-mono text-sm">
+          INITIALIZING MARKET STREAM...
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="p-4 text-red-400">
-        {error}
+      <div className="p-8 text-center bg-[#0f172a] border-b border-white/10">
+        <div className="text-red-400 font-mono text-sm">
+          {error}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="bg-[#0f172a] border-b border-white/10 p-4">
-      <h2 className="text-green-300 font-semibold mb-4">
-        EUR/USD — Live Market Chart
-      </h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-[#80f7c7] font-mono text-xs tracking-widest uppercase">
+          Live Feed: EUR/USD (1m)
+        </h2>
+        <span className="text-[10px] text-white/30 font-mono">
+          REFRESHING EVERY 30S
+        </span>
+      </div>
 
       <div
         ref={chartContainerRef}
-        className="w-full h-[300px]"
+        className="w-full h-[300px] rounded-lg overflow-hidden border border-white/5"
       />
     </div>
   );
