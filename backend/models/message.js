@@ -4,8 +4,15 @@ const messageSchema = new mongoose.Schema(
   {
     room: {
       type: String,
-      enum: ["general", "feeds"],
-      default: "general",
+      enum: [
+        "general-chat",
+        "market-analysis",
+        "private-team-updates",
+        "live-signals",
+        "one-on-one-request",
+        "full-trading-course",
+      ],
+      default: "general-chat",
     },
     text: {
       type: String,
@@ -35,18 +42,10 @@ const messageSchema = new mongoose.Schema(
         type: String,
         enum: ["image", "video"],
       },
-      mimeType: {
-        type: String,
-      },
-      dataUrl: {
-        type: String,
-      },
-      fileName: {
-        type: String,
-      },
-      size: {
-        type: Number,
-      },
+      mimeType: String,
+      dataUrl: String,
+      fileName: String,
+      size: Number,
     },
   },
   { timestamps: true }
@@ -55,15 +54,10 @@ const messageSchema = new mongoose.Schema(
 messageSchema.pre("validate", function (next) {
   const hasText = typeof this.text === "string" && this.text.trim().length > 0;
   const hasMedia = Boolean(this.media?.dataUrl);
-
   if (!hasText && !hasMedia) {
     return next(new Error("Message must contain text or media"));
   }
-
   next();
 });
 
-const Message =
-  mongoose.models.Message || mongoose.model("Message", messageSchema);
-
-export default Message;
+export default mongoose.models.Message || mongoose.model("Message", messageSchema);

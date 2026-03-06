@@ -16,12 +16,10 @@ export default function Home() {
   const socketRef = useRef(null);
   const messagesEndRef = useRef(null);
 
-  const getToken = () => localStorage.getItem("token");
-  const token = getToken();
+  const token = localStorage.getItem("token");
 
   const [activeRoom, setActiveRoom] = useState("general-chat");
   const [newMessage, setNewMessage] = useState("");
-
   const [messages, setMessages] = useState({
     "general-chat": [],
     "market-analysis": [],
@@ -31,46 +29,46 @@ export default function Home() {
     "full-trading-course": [],
   });
 
+  // Robust JWT Decoder to extract username and role
   const userInfo = (() => {
     try {
       if (!token) return null;
-      return JSON.parse(atob(token.split(".")[1]));
+      const base64Url = token.split(".")[1];
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      return JSON.parse(window.atob(base64));
     } catch {
+
       return null;
     }
   })();
 
   const currentUserId = userInfo?.userId || null;
-  const currentUsername = userInfo?.username || "";
+  const currentUsername = userInfo?.username || "Guest User";
   const isAdmin = userInfo?.role === "admin";
 
+  // Auto-scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, activeRoom]);
 
   /* ============================================================
-     EFFECT 1: SOCKET INITIALIZATION (Runs once)
+      EFFECT 1: SOCKET INITIALIZATION
      ============================================================ */
   useEffect(() => {
-    const storedToken = getToken();
-
-    if (!storedToken) {
+    if (!token) {
       navigate("/login");
       return;
     }
 
     const socket = io(SOCKET_URL, {
-      auth: { token: storedToken },
+      auth: { token },
       transports: ["websocket", "polling"],
-      reconnection: true,
-      reconnectionAttempts: 10,
     });
 
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      console.log("Connected to Socket Server");
-      // Re-join active room on reconnection (prevents losing stream after signal drop)
+      console.log("Connected to Matrix Socket");
       socket.emit("joinRoom", activeRoom);
     });
 
@@ -82,20 +80,9 @@ export default function Home() {
       }));
     });
 
-    socket.on("messageEdited", ({ _id, text, room, isEdited }) => {
-      setMessages((prev) => ({
-        ...prev,
-        [room]: prev[room].map((msg) =>
-          msg._id === _id ? { ...msg, text, isEdited } : msg
-        ),
-      }));
-    });
-
-    socket.on("messageDeleted", ({ _id, room }) => {
-      setMessages((prev) => ({
-        ...prev,
-        [room]: prev[room].filter((msg) => msg._id !== _id),
-      }));
+    socket.on("connect_error", (err) => {
+      console.error("Socket Auth Error:", err.message);
+      if (err.message === "Authentication error") navigate("/login");
     });
 
     return () => {
@@ -103,21 +90,17 @@ export default function Home() {
       socketRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigate]); 
-  // Note: activeRoom is excluded here intentionally because we handle 
-  // room switching in the effect below to avoid socket reconnections.
+  }, [navigate]);
 
   /* ============================================================
-     EFFECT 2: ROOM SWITCHING (Runs on activeRoom change)
+      EFFECT 2: ROOM SWITCHING & HISTORY FETCHING
      ============================================================ */
   useEffect(() => {
-    // 1. Inform the socket server of the room change
     if (socketRef.current?.connected) {
       socketRef.current.emit("joinRoom", activeRoom);
     }
 
-    // 2. Fetch history for the new room
-    const loadMessages = async () => {
+    const loadHistory = async () => {
       try {
         const { data } = await api.get(`/messages?room=${activeRoom}`);
         setMessages((prev) => ({
@@ -125,15 +108,16 @@ export default function Home() {
           [activeRoom]: data,
         }));
       } catch (err) {
-        console.error("Failed to load messages", err);
+        console.error("History fetch failed:", err);
       }
     };
 
-    loadMessages();
+    loadHistory();
   }, [activeRoom]);
 
   const handleSend = () => {
     if (!newMessage.trim() || !socketRef.current) return;
+    
     socketRef.current.emit("sendMessage", {
       text: newMessage.trim(),
       room: activeRoom,
@@ -160,93 +144,113 @@ export default function Home() {
   };
 
   const handleLogout = () => {
-    localStorage.clear();
+    localStorage.removeItem("token");
     socketRef.current?.disconnect();
     navigate("/login");
   };
 
   return (
-    <div className="h-screen flex bg-[#05080f] text-green-200 font-mono">
+    <div className="h-screen flex bg-[#05080f] text-green-200 font-mono overflow-hidden">
+      
       {/* SIDEBAR */}
-      <div className="w-72 flex flex-col bg-[#101521] border-r border-white/10">
-        <div className="p-5 border-b border-[#00ff9c]/20">
-          <h2 className="text-[#80f7c7] text-sm tracking-[0.25em]">CR MATRIX</h2>
+      <div className="w-72 flex flex-col bg-[#101521] border-r border-white/10 shrink-0">
+        <div className="p-6 border-b border-[#00ff9c]/20">
+          <h2 className="text-[#00ff9c] text-lg font-bold tracking-widest">CR MATRIX</h2>
+          <p className="text-[10px] text-white/30 uppercase mt-1">Terminal v3.0.1</p>
         </div>
 
-        <div className="flex-1 p-4 space-y-2 text-sm">
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto custom-scrollbar">
           {[
-            { id: "general-chat", label: "general-chat 💬" },
-            { id: "market-analysis", label: "market-analysis" },
-            { id: "private-team-updates", label: "private-team-updates 🔒" },
-            { id: "live-signals", label: "live-signals 📉" },
-            { id: "one-on-one-request", label: "one-on-one-request" },
-            { id: "full-trading-course", label: "full-trading-course 📖" },
+            { id: "general-chat", label: "GENERAL CHAT", icon: "💬" },
+            { id: "market-analysis", label: "MARKET ANALYSIS", icon: "📊" },
+            { id: "live-signals", label: "LIVE SIGNALS", icon: "📉" },
+            { id: "private-team-updates", label: "TEAM UPDATES", icon: "🔒" },
+            { id: "one-on-one-request", label: "CONSULTATION", icon: "🤝" },
+            { id: "full-trading-course", label: "TRADING COURSE", icon: "📖" },
           ].map((room) => (
             <button
               key={room.id}
               onClick={() => setActiveRoom(room.id)}
-              className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
                 activeRoom === room.id
-                  ? "bg-[#1b2030] text-green-100 shadow-[0_0_10px_rgba(128,247,199,0.1)]"
-                  : "text-green-100/70 hover:text-green-100 hover:bg-[#1b2030]/50"
+                  ? "bg-[#00ff9c]/10 text-[#00ff9c] border border-[#00ff9c]/20 shadow-[0_0_15px_rgba(0,255,156,0.1)]"
+                  : "text-white/50 hover:text-white hover:bg-white/5"
               }`}
             >
-              # {room.label}
+              <span className="text-lg">{room.icon}</span>
+              <span className="text-xs font-bold tracking-tighter">{room.label}</span>
             </button>
           ))}
-        </div>
+        </nav>
 
-        <div className="p-4 border-t border-white/10">
-          <div className="mb-4 px-3 py-2 bg-[#0d1320] rounded border border-white/5">
-            <p className="text-[10px] text-green-100/40 uppercase">Identified as</p>
-            <p className="text-xs text-[#80f7c7] truncate">{currentUsername}</p>
+        <div className="p-4 bg-[#0a0f1a] border-t border-white/5">
+          <div className="mb-4 px-4 py-3 bg-black/40 rounded-lg border border-white/5">
+            <p className="text-[9px] text-white/20 uppercase tracking-[0.2em] mb-1">Authenticated As</p>
+            <div className="flex items-center gap-2">
+               <div className={`w-2 h-2 rounded-full ${isAdmin ? 'bg-red-500' : 'bg-green-500'}`}></div>
+               <p className="text-xs text-[#00ff9c] font-bold truncate uppercase">{currentUsername}</p>
+            </div>
+            {isAdmin && <p className="text-[8px] text-red-400 mt-1">SYSTEM ADMINISTRATOR</p>}
           </div>
           <button
             onClick={handleLogout}
-            className="w-full text-left text-sm text-red-400 hover:text-red-300 transition-colors"
+            className="w-full py-2 text-xs text-red-500/70 hover:text-red-400 font-bold border border-red-500/20 rounded hover:bg-red-500/5 transition-all"
           >
-            Logout
+            TERMINATE SESSION
           </button>
         </div>
       </div>
 
-      {/* CHAT AREA */}
-      <div className="flex-1 flex flex-col">
-        <div className="border-b border-white/10 bg-[#0d1320] p-4 text-sm flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-            <span className="text-green-100 font-bold uppercase tracking-widest">
-              {activeRoom.replace("-", " ")}
-            </span>
+      {/* MAIN CHAT AREA */}
+      <div className="flex-1 flex flex-col min-w-0 relative">
+        
+        {/* HEADER */}
+        <header className="h-16 border-b border-white/10 bg-[#0d1320] flex items-center justify-between px-6 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_#22c55e]"></div>
+            <h1 className="text-white font-bold text-sm tracking-widest uppercase italic">
+              // {activeRoom.replace("-", " ")}
+            </h1>
           </div>
-          <span className="text-xs text-green-100/50">
-            {messages[activeRoom]?.length || 0} signals/messages
-          </span>
-        </div>
+          <div className="flex items-center gap-4">
+             <span className="text-[10px] text-white/20 font-mono">ENCRYPTION: AES-256</span>
+             <div className="h-4 w-[1px] bg-white/10"></div>
+             <span className="text-[10px] text-green-500/70 font-mono uppercase">{messages[activeRoom]?.length || 0} Packets</span>
+          </div>
+        </header>
 
-        <div className="flex-1 flex flex-col overflow-hidden">
+        {/* FEED CONTENT */}
+        <main className="flex-1 flex flex-col overflow-hidden bg-[#05080f]">
           {activeRoom === "market-analysis" && <MarketFeed />}
 
-          <div className="flex-1 p-6 space-y-4 overflow-y-auto bg-gradient-to-b from-[#111827] to-[#0c1422]">
-            {(messages[activeRoom] || []).map((msg) => (
-              <Message
-                key={msg._id}
-                user={msg.username || "User"}
-                role={msg.role}
-                text={msg.text}
-                media={msg.media}
-                isOwn={String(msg.user || "") === String(currentUserId || "")}
-              />
-            ))}
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+            {messages[activeRoom]?.length === 0 ? (
+              <div className="h-full flex items-center justify-center opacity-20 flex-col">
+                <p className="text-xs tracking-[0.5em]">NO DATA RECEIVED</p>
+              </div>
+            ) : (
+              messages[activeRoom].map((msg) => (
+                <Message
+                  key={msg._id}
+                  user={msg.username}
+                  role={msg.role}
+                  text={msg.text}
+                  media={msg.media}
+                  isOwn={String(msg.user) === String(currentUserId)}
+                  timestamp={msg.createdAt}
+                />
+              ))
+            )}
             <div ref={messagesEndRef} />
           </div>
-        </div>
+        </main>
 
-        <div className="border-t border-white/10 bg-[#0d1320] p-4">
-          <div className="flex gap-3 items-center max-w-6xl mx-auto">
+        {/* INPUT AREA */}
+        <footer className="p-4 bg-[#0d1320] border-t border-white/10">
+          <div className="max-w-5xl mx-auto flex gap-3 items-center">
             {isAdmin && (
-              <label className="cursor-pointer bg-[#1b2030] px-3 py-2 rounded-md text-green-200 hover:bg-[#222b40] border border-white/10 transition-colors">
-                📎
+              <label className="p-3 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 cursor-pointer transition-all">
+                <span className="text-xl">+</span>
                 <input
                   type="file"
                   className="hidden"
@@ -255,23 +259,25 @@ export default function Home() {
               </label>
             )}
 
-            <input
-              type="text"
-              placeholder={`Broadcast to #${activeRoom}...`}
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSend()}
-              className="flex-1 bg-[#101829] border border-white/15 rounded-md px-4 py-2 text-green-100 outline-none focus:border-[#80f7c7]/50 placeholder:text-white/20"
-            />
+            <div className="flex-1 relative">
+               <input
+                type="text"
+                placeholder={`Type command for #${activeRoom}...`}
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                className="w-full bg-black/40 border border-white/10 rounded-xl px-5 py-4 text-sm text-white outline-none focus:border-[#00ff9c]/40 transition-all placeholder:text-white/10"
+              />
+            </div>
 
             <button
               onClick={handleSend}
-              className="px-6 py-2 bg-[#6366f1] text-white rounded-md hover:bg-[#4f46e5] font-bold shadow-lg shadow-indigo-500/20 transition-all active:scale-95"
+              className="px-8 py-4 bg-[#00ff9c] text-black font-black text-xs rounded-xl hover:scale-105 active:scale-95 transition-all shadow-[0_0_20px_rgba(0,255,156,0.3)]"
             >
-              SEND
+              EXECUTE
             </button>
           </div>
-        </div>
+        </footer>
       </div>
     </div>
   );
