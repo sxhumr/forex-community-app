@@ -29,7 +29,7 @@ export default function Home() {
     "full-trading-course": [],
   });
 
-  // Robust JWT Decoder to extract username and role
+  // Decode JWT to extract user details
   const userInfo = (() => {
     try {
       if (!token) return null;
@@ -37,7 +37,6 @@ export default function Home() {
       const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
       return JSON.parse(window.atob(base64));
     } catch {
-
       return null;
     }
   })();
@@ -68,7 +67,7 @@ export default function Home() {
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      console.log("Connected to Matrix Socket");
+      console.log("🟢 Connected to Matrix Socket");
       socket.emit("joinRoom", activeRoom);
     });
 
@@ -82,15 +81,16 @@ export default function Home() {
 
     socket.on("connect_error", (err) => {
       console.error("Socket Auth Error:", err.message);
-      if (err.message === "Authentication error") navigate("/login");
+      if (err.message === "Auth failed" || err.message === "No token") {
+        navigate("/login");
+      }
     });
 
     return () => {
       socket.disconnect();
       socketRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigate]);
+  }, [navigate, token]);
 
   /* ============================================================
       EFFECT 2: ROOM SWITCHING & HISTORY FETCHING
@@ -115,6 +115,9 @@ export default function Home() {
     loadHistory();
   }, [activeRoom]);
 
+  /* ============================================================
+      HANDLERS
+     ============================================================ */
   const handleSend = () => {
     if (!newMessage.trim() || !socketRef.current) return;
     
@@ -125,17 +128,26 @@ export default function Home() {
     setNewMessage("");
   };
 
-  const handleMediaUpload = (file) => {
+  const handleImageUpload = (file) => {
     if (!file || !socketRef.current) return;
+
+    if (!["image/jpeg", "image/png"].includes(file.type)) {
+      alert("Only JPG and PNG allowed");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Max 5MB");
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = () => {
       socketRef.current.emit("sendMessage", {
         room: activeRoom,
         media: {
-          type: file.type.startsWith("video") ? "video" : "image",
           mimeType: file.type,
           dataUrl: reader.result,
-          fileName: file.name,
           size: file.size,
         },
       });
@@ -187,7 +199,7 @@ export default function Home() {
           <div className="mb-4 px-4 py-3 bg-black/40 rounded-lg border border-white/5">
             <p className="text-[9px] text-white/20 uppercase tracking-[0.2em] mb-1">Authenticated As</p>
             <div className="flex items-center gap-2">
-               <div className={`w-2 h-2 rounded-full ${isAdmin ? 'bg-red-500' : 'bg-green-500'}`}></div>
+               <div className={`w-2 h-2 rounded-full ${isAdmin ? 'bg-red-500 shadow-[0_0_5px_red]' : 'bg-green-500 shadow-[0_0_5px_#00ff9c]'}`}></div>
                <p className="text-xs text-[#00ff9c] font-bold truncate uppercase">{currentUsername}</p>
             </div>
             {isAdmin && <p className="text-[8px] text-red-400 mt-1">SYSTEM ADMINISTRATOR</p>}
@@ -209,7 +221,7 @@ export default function Home() {
           <div className="flex items-center gap-3">
             <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_#22c55e]"></div>
             <h1 className="text-white font-bold text-sm tracking-widest uppercase italic">
-              // {activeRoom.replace("-", " ")}
+              // {activeRoom.replace(/-/g, " ")}
             </h1>
           </div>
           <div className="flex items-center gap-4">
@@ -229,9 +241,9 @@ export default function Home() {
                 <p className="text-xs tracking-[0.5em]">NO DATA RECEIVED</p>
               </div>
             ) : (
-              messages[activeRoom].map((msg) => (
+              messages[activeRoom].map((msg, index) => (
                 <Message
-                  key={msg._id}
+                  key={msg._id || index}
                   user={msg.username}
                   role={msg.role}
                   text={msg.text}
@@ -248,16 +260,20 @@ export default function Home() {
         {/* INPUT AREA */}
         <footer className="p-4 bg-[#0d1320] border-t border-white/10">
           <div className="max-w-5xl mx-auto flex gap-3 items-center">
-            {isAdmin && (
-              <label className="p-3 bg-white/5 rounded-xl border border-white/10 hover:bg-white/10 cursor-pointer transition-all">
-                <span className="text-xl">+</span>
-                <input
-                  type="file"
-                  className="hidden"
-                  onChange={(e) => handleMediaUpload(e.target.files[0])}
-                />
-              </label>
-            )}
+            
+            {/* CAMERA UPLOAD BUTTON */}
+            <label className="cursor-pointer bg-[#1b2030] px-3 py-2 rounded-md hover:bg-[#252b3d] transition-all flex items-center justify-center border border-white/5">
+              <span className="text-lg">📷</span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png"
+                className="hidden"
+                onChange={(e) => {
+                  handleImageUpload(e.target.files[0]);
+                  e.target.value = ""; // Reset to allow re-upload of same file
+                }}
+              />
+            </label>
 
             <div className="flex-1 relative">
                <input
