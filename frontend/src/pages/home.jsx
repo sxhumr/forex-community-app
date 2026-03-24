@@ -13,13 +13,9 @@ const SOCKET_URL =
 
 export default function Home() {
   const navigate = useNavigate();
-  const socketRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const socketRef = useRef(null);
 
-  const token = localStorage.getItem("token");
-
-  const [activeRoom, setActiveRoom] = useState("general-chat");
-  const [newMessage, setNewMessage] = useState("");
   const [messages, setMessages] = useState({
     "general-chat": [],
     "market-analysis": [],
@@ -29,271 +25,176 @@ export default function Home() {
     "full-trading-course": [],
   });
 
-  // Decode JWT to extract user details
-  const userInfo = (() => {
-    try {
-      if (!token) return null;
-      const base64Url = token.split(".")[1];
-      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-      return JSON.parse(window.atob(base64));
-    } catch {
-      return null;
-    }
-  })();
+  const [newMessage, setNewMessage] = useState("");
+  const [activeRoom, setActiveRoom] = useState("general-chat");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const currentUserId = userInfo?.userId || null;
-  const currentUsername = userInfo?.username || "Guest User";
-  const isAdmin = userInfo?.role === "admin";
+  const getToken = () => localStorage.getItem("token");
+  const token = getToken();
 
-  // Auto-scroll to bottom on new messages
+  /* AUTO SCROLL */
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, activeRoom]);
 
-  /* ============================================================
-      EFFECT 1: SOCKET INITIALIZATION
-     ============================================================ */
+  /* SOCKET */
   useEffect(() => {
-    if (!token) {
+    const storedToken = getToken();
+
+    if (!storedToken) {
       navigate("/login");
       return;
     }
 
     const socket = io(SOCKET_URL, {
-      auth: { token },
-      transports: ["websocket", "polling"],
+      auth: { token: storedToken },
+      transports: ["polling"],
     });
 
     socketRef.current = socket;
 
-    socket.on("connect", () => {
-      console.log("🟢 Connected to Matrix Socket");
-      socket.emit("joinRoom", activeRoom);
-    });
-
     socket.on("newMessage", (message) => {
-      const room = message.room || "general-chat";
       setMessages((prev) => ({
         ...prev,
-        [room]: [...(prev[room] || []), message],
+        [message.room]: [...prev[message.room], message],
       }));
     });
 
-    socket.on("connect_error", (err) => {
-      console.error("Socket Auth Error:", err.message);
-      if (err.message === "Auth failed" || err.message === "No token") {
-        navigate("/login");
-      }
-    });
+    return () => socket.disconnect();
+  }, [navigate]);
 
-    return () => {
-      socket.disconnect();
-      socketRef.current = null;
-    };
-  }, [navigate, token]);
-
-  /* ============================================================
-      EFFECT 2: ROOM SWITCHING & HISTORY FETCHING
-     ============================================================ */
+  /* LOAD MESSAGES */
   useEffect(() => {
-    if (socketRef.current?.connected) {
-      socketRef.current.emit("joinRoom", activeRoom);
-    }
-
-    const loadHistory = async () => {
+    const loadMessages = async () => {
       try {
-        const { data } = await api.get(`/messages?room=${activeRoom}`);
+        const { data } = await api.get(`/messages?room=${activeRoom}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
         setMessages((prev) => ({
           ...prev,
           [activeRoom]: data,
         }));
       } catch (err) {
-        console.error("History fetch failed:", err);
+        console.error(err);
       }
     };
 
-    loadHistory();
+    loadMessages();
   }, [activeRoom]);
 
-  /* ============================================================
-      HANDLERS
-     ============================================================ */
   const handleSend = () => {
-    if (!newMessage.trim() || !socketRef.current) return;
-    
+    if (!newMessage.trim()) return;
+
     socketRef.current.emit("sendMessage", {
       text: newMessage.trim(),
       room: activeRoom,
     });
+
     setNewMessage("");
   };
 
-  const handleImageUpload = (file) => {
-    if (!file || !socketRef.current) return;
-
-    if (!["image/jpeg", "image/png"].includes(file.type)) {
-      alert("Only JPG and PNG allowed");
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      alert("Max 5MB");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      socketRef.current.emit("sendMessage", {
-        room: activeRoom,
-        media: {
-          mimeType: file.type,
-          dataUrl: reader.result,
-          size: file.size,
-        },
-      });
-    };
-    reader.readAsDataURL(file);
-  };
-
   const handleLogout = () => {
-    localStorage.removeItem("token");
+    localStorage.clear();
     socketRef.current?.disconnect();
     navigate("/login");
   };
 
   return (
-    <div className="h-screen flex bg-[#05080f] text-green-200 font-mono overflow-hidden">
-      
+    <div className="h-screen flex bg-[#05080f] text-green-200 font-mono">
+
+      {/* MOBILE HEADER */}
+      <div className="md:hidden fixed top-0 left-0 right-0 bg-[#0d1320] p-3 flex justify-between items-center z-50">
+        <button onClick={() => setSidebarOpen(!sidebarOpen)}>
+          ☰
+        </button>
+        <span className="text-sm">
+          {activeRoom}
+        </span>
+      </div>
+
       {/* SIDEBAR */}
-      <div className="w-72 flex flex-col bg-[#101521] border-r border-white/10 shrink-0">
-        <div className="p-6 border-b border-[#00ff9c]/20">
-          <h2 className="text-[#00ff9c] text-lg font-bold tracking-widest">CR MATRIX</h2>
-          <p className="text-[10px] text-white/30 uppercase mt-1">Terminal v3.0.1</p>
+      <div className={`
+        fixed md:relative z-40
+        h-full w-64 bg-[#101521] border-r border-white/10
+        transform transition-transform duration-300
+        ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+        md:translate-x-0
+      `}>
+        <div className="p-5 border-b border-[#00ff9c]/20">
+          CR MATRIX
         </div>
 
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto custom-scrollbar">
-          {[
-            { id: "general-chat", label: "GENERAL CHAT", icon: "💬" },
-            { id: "market-analysis", label: "MARKET ANALYSIS", icon: "📊" },
-            { id: "live-signals", label: "LIVE SIGNALS", icon: "📉" },
-            { id: "private-team-updates", label: "TEAM UPDATES", icon: "🔒" },
-            { id: "one-on-one-request", label: "CONSULTATION", icon: "🤝" },
-            { id: "full-trading-course", label: "TRADING COURSE", icon: "📖" },
-          ].map((room) => (
+        <div className="p-4 space-y-2 text-sm">
+          {Object.keys(messages).map((room) => (
             <button
-              key={room.id}
-              onClick={() => setActiveRoom(room.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-                activeRoom === room.id
-                  ? "bg-[#00ff9c]/10 text-[#00ff9c] border border-[#00ff9c]/20 shadow-[0_0_15px_rgba(0,255,156,0.1)]"
-                  : "text-white/50 hover:text-white hover:bg-white/5"
+              key={room}
+              onClick={() => {
+                setActiveRoom(room);
+                setSidebarOpen(false);
+              }}
+              className={`w-full text-left px-3 py-2 rounded-md ${
+                activeRoom === room
+                  ? "bg-[#1b2030]"
+                  : "hover:bg-[#1b2030]"
               }`}
             >
-              <span className="text-lg">{room.icon}</span>
-              <span className="text-xs font-bold tracking-tighter">{room.label}</span>
+              {room}
             </button>
           ))}
-        </nav>
+        </div>
 
-        <div className="p-4 bg-[#0a0f1a] border-t border-white/5">
-          <div className="mb-4 px-4 py-3 bg-black/40 rounded-lg border border-white/5">
-            <p className="text-[9px] text-white/20 uppercase tracking-[0.2em] mb-1">Authenticated As</p>
-            <div className="flex items-center gap-2">
-               <div className={`w-2 h-2 rounded-full ${isAdmin ? 'bg-red-500 shadow-[0_0_5px_red]' : 'bg-green-500 shadow-[0_0_5px_#00ff9c]'}`}></div>
-               <p className="text-xs text-[#00ff9c] font-bold truncate uppercase">{currentUsername}</p>
-            </div>
-            {isAdmin && <p className="text-[8px] text-red-400 mt-1">SYSTEM ADMINISTRATOR</p>}
-          </div>
-          <button
-            onClick={handleLogout}
-            className="w-full py-2 text-xs text-red-500/70 hover:text-red-400 font-bold border border-red-500/20 rounded hover:bg-red-500/5 transition-all"
-          >
-            TERMINATE SESSION
+        <div className="p-4">
+          <button onClick={handleLogout} className="text-red-400">
+            Logout
           </button>
         </div>
       </div>
 
-      {/* MAIN CHAT AREA */}
-      <div className="flex-1 flex flex-col min-w-0 relative">
-        
+      {/* CHAT AREA */}
+      <div className="flex-1 flex flex-col pt-12 md:pt-0">
+
         {/* HEADER */}
-        <header className="h-16 border-b border-white/10 bg-[#0d1320] flex items-center justify-between px-6 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_#22c55e]"></div>
-            <h1 className="text-white font-bold text-sm tracking-widest uppercase italic">
-              // {activeRoom.replace(/-/g, " ")}
-            </h1>
-          </div>
-          <div className="flex items-center gap-4">
-             <span className="text-[10px] text-white/20 font-mono">ENCRYPTION: AES-256</span>
-             <div className="h-4 w-[1px] bg-white/10"></div>
-             <span className="text-[10px] text-green-500/70 font-mono uppercase">{messages[activeRoom]?.length || 0} Packets</span>
-          </div>
-        </header>
+        <div className="hidden md:flex border-b border-white/10 p-4 justify-between">
+          <span>{activeRoom}</span>
+          <span>{messages[activeRoom].length} msgs</span>
+        </div>
 
-        {/* FEED CONTENT */}
-        <main className="flex-1 flex flex-col overflow-hidden bg-[#05080f]">
-          {activeRoom === "market-analysis" && <MarketFeed />}
+        {/* MARKET FEED */}
+        {activeRoom === "market-analysis" && <MarketFeed />}
 
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-            {messages[activeRoom]?.length === 0 ? (
-              <div className="h-full flex items-center justify-center opacity-20 flex-col">
-                <p className="text-xs tracking-[0.5em]">NO DATA RECEIVED</p>
-              </div>
-            ) : (
-              messages[activeRoom].map((msg, index) => (
-                <Message
-                  key={msg._id || index}
-                  user={msg.username}
-                  role={msg.role}
-                  text={msg.text}
-                  media={msg.media}
-                  isOwn={String(msg.user) === String(currentUserId)}
-                  timestamp={msg.createdAt}
-                />
-              ))
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-        </main>
+        {/* MESSAGES */}
+        <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-3">
+          {messages[activeRoom].map((msg) => (
+            <Message key={msg._id} {...msg} />
+          ))}
+          <div ref={messagesEndRef} />
+        </div>
 
-        {/* INPUT AREA */}
-        <footer className="p-4 bg-[#0d1320] border-t border-white/10">
-          <div className="max-w-5xl mx-auto flex gap-3 items-center">
-            
-            {/* CAMERA UPLOAD BUTTON */}
-            <label className="cursor-pointer bg-[#1b2030] px-3 py-2 rounded-md hover:bg-[#252b3d] transition-all flex items-center justify-center border border-white/5">
-              <span className="text-lg">📷</span>
-              <input
-                type="file"
-                accept="image/jpeg,image/png"
-                className="hidden"
-                onChange={(e) => {
-                  handleImageUpload(e.target.files[0]);
-                  e.target.value = ""; // Reset to allow re-upload of same file
-                }}
-              />
-            </label>
+        {/* INPUT */}
+        <div className="p-3 border-t border-white/10">
+          <div className="flex gap-2">
 
-            <div className="flex-1 relative">
-               <input
-                type="text"
-                placeholder={`Type command for #${activeRoom}...`}
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                className="w-full bg-black/40 border border-white/10 rounded-xl px-5 py-4 text-sm text-white outline-none focus:border-[#00ff9c]/40 transition-all placeholder:text-white/10"
-              />
-            </div>
+            <input
+              type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSend()}
+              placeholder="Type message..."
+              className="flex-1 px-3 py-2 text-sm md:text-base bg-[#101829] rounded-md outline-none"
+            />
 
             <button
               onClick={handleSend}
-              className="px-8 py-4 bg-[#00ff9c] text-black font-black text-xs rounded-xl hover:scale-105 active:scale-95 transition-all shadow-[0_0_20px_rgba(0,255,156,0.3)]"
+              className="px-3 md:px-5 py-2 bg-purple-500 rounded-md text-white"
             >
-              EXECUTE
+              Send
             </button>
+
           </div>
-        </footer>
+        </div>
       </div>
     </div>
   );
