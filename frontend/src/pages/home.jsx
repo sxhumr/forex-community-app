@@ -29,8 +29,7 @@ export default function Home() {
   const [activeRoom, setActiveRoom] = useState("general-chat");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const getToken = () => localStorage.getItem("token");
-  const token = getToken();
+  const token = localStorage.getItem("token");
 
   /* AUTO SCROLL */
   useEffect(() => {
@@ -39,15 +38,13 @@ export default function Home() {
 
   /* SOCKET */
   useEffect(() => {
-    const storedToken = getToken();
-
-    if (!storedToken) {
+    if (!token) {
       navigate("/login");
       return;
     }
 
     const socket = io(SOCKET_URL, {
-      auth: { token: storedToken },
+      auth: { token },
       transports: ["polling"],
     });
 
@@ -56,12 +53,12 @@ export default function Home() {
     socket.on("newMessage", (message) => {
       setMessages((prev) => ({
         ...prev,
-        [message.room]: [...prev[message.room], message],
+        [message.room]: [...(prev[message.room] || []), message],
       }));
     });
 
     return () => socket.disconnect();
-  }, [navigate]);
+  }, [navigate, token]);
 
   /* LOAD MESSAGES */
   useEffect(() => {
@@ -83,7 +80,7 @@ export default function Home() {
     };
 
     loadMessages();
-  }, [activeRoom]);
+  }, [activeRoom, token]);
 
   const handleSend = () => {
     if (!newMessage.trim()) return;
@@ -96,22 +93,52 @@ export default function Home() {
     setNewMessage("");
   };
 
+  /* IMAGE UPLOAD */
+  const handleImageUpload = (file) => {
+    if (!file || !socketRef.current) return;
+
+    if (!["image/jpeg", "image/png"].includes(file.type)) {
+      alert("Only JPG and PNG allowed");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Max file size is 5MB");
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      socketRef.current.emit("sendMessage", {
+        room: activeRoom,
+        media: {
+          mimeType: file.type,
+          dataUrl: reader.result,
+          size: file.size,
+        },
+      });
+    };
+
+    reader.readAsDataURL(file);
+  };
+
   const handleLogout = () => {
     localStorage.clear();
     socketRef.current?.disconnect();
     navigate("/login");
   };
 
+  const rooms = Object.keys(messages);
+
   return (
     <div className="h-screen flex bg-[#05080f] text-green-200 font-mono">
 
       {/* MOBILE HEADER */}
       <div className="md:hidden fixed top-0 left-0 right-0 bg-[#0d1320] p-3 flex justify-between items-center z-50">
-        <button onClick={() => setSidebarOpen(!sidebarOpen)}>
-          ☰
-        </button>
+        <button onClick={() => setSidebarOpen(!sidebarOpen)}>☰</button>
         <span className="text-sm">
-          {activeRoom}
+          {activeRoom.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase())}
         </span>
       </div>
 
@@ -128,7 +155,7 @@ export default function Home() {
         </div>
 
         <div className="p-4 space-y-2 text-sm">
-          {Object.keys(messages).map((room) => (
+          {rooms.map((room) => (
             <button
               key={room}
               onClick={() => {
@@ -141,7 +168,7 @@ export default function Home() {
                   : "hover:bg-[#1b2030]"
               }`}
             >
-              {room}
+              {room.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase())}
             </button>
           ))}
         </div>
@@ -158,24 +185,42 @@ export default function Home() {
 
         {/* HEADER */}
         <div className="hidden md:flex border-b border-white/10 p-4 justify-between">
-          <span>{activeRoom}</span>
-          <span>{messages[activeRoom].length} msgs</span>
+          <span>
+            {activeRoom.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase())}
+          </span>
+          <span>{messages[activeRoom]?.length || 0} msgs</span>
         </div>
 
         {/* MARKET FEED */}
         {activeRoom === "market-analysis" && <MarketFeed />}
 
         {/* MESSAGES */}
-        <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-3">
-          {messages[activeRoom].map((msg) => (
-            <Message key={msg._id} {...msg} />
+        <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-4">
+          {messages[activeRoom]?.map((msg) => (
+            <Message
+              key={msg._id}
+              user={msg.username}
+              text={msg.text}
+              media={msg.media}
+            />
           ))}
           <div ref={messagesEndRef} />
         </div>
 
         {/* INPUT */}
         <div className="p-3 border-t border-white/10">
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+
+            {/* Upload button */}
+            <label className="cursor-pointer bg-[#1b2030] px-3 py-2 rounded-md">
+              📷
+              <input
+                type="file"
+                accept="image/jpeg,image/png"
+                className="hidden"
+                onChange={(e) => handleImageUpload(e.target.files[0])}
+              />
+            </label>
 
             <input
               type="text"
