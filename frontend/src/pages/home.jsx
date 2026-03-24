@@ -36,7 +36,7 @@ export default function Home() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, activeRoom]);
 
-  /* SOCKET */
+  /* SOCKET SETUP */
   useEffect(() => {
     if (!token) {
       navigate("/login");
@@ -45,10 +45,15 @@ export default function Home() {
 
     const socket = io(SOCKET_URL, {
       auth: { token },
-      transports: ["polling"],
+      transports: ["polling"], // Render safe
+      reconnection: true,
     });
 
     socketRef.current = socket;
+
+    socket.on("connect", () => {
+      console.log("🟢 Socket connected");
+    });
 
     socket.on("newMessage", (message) => {
       setMessages((prev) => ({
@@ -57,7 +62,10 @@ export default function Home() {
       }));
     });
 
-    return () => socket.disconnect();
+    return () => {
+      socket.disconnect();
+      socketRef.current = null;
+    };
   }, [navigate, token]);
 
   /* LOAD MESSAGES */
@@ -75,13 +83,14 @@ export default function Home() {
           [activeRoom]: data,
         }));
       } catch (err) {
-        console.error(err);
+        console.error("❌ Failed to load messages", err);
       }
     };
 
     loadMessages();
   }, [activeRoom, token]);
 
+  /* SEND MESSAGE */
   const handleSend = () => {
     if (!newMessage.trim()) return;
 
@@ -96,6 +105,8 @@ export default function Home() {
   /* IMAGE UPLOAD */
   const handleImageUpload = (file) => {
     if (!file || !socketRef.current) return;
+
+    console.log("📷 Uploading:", file.name);
 
     if (!["image/jpeg", "image/png"].includes(file.type)) {
       alert("Only JPG and PNG allowed");
@@ -211,17 +222,24 @@ export default function Home() {
         <div className="p-3 border-t border-white/10">
           <div className="flex gap-2 items-center">
 
-            {/* Upload button */}
+            {/* 📷 Upload Button */}
             <label className="cursor-pointer bg-[#1b2030] px-3 py-2 rounded-md">
               📷
               <input
                 type="file"
                 accept="image/jpeg,image/png"
                 className="hidden"
-                onChange={(e) => handleImageUpload(e.target.files[0])}
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  handleImageUpload(file);
+
+                  // 🔥 critical fix
+                  e.target.value = "";
+                }}
               />
             </label>
 
+            {/* TEXT INPUT */}
             <input
               type="text"
               value={newMessage}
@@ -231,6 +249,7 @@ export default function Home() {
               className="flex-1 px-3 py-2 text-sm md:text-base bg-[#101829] rounded-md outline-none"
             />
 
+            {/* SEND BUTTON */}
             <button
               onClick={handleSend}
               className="px-3 md:px-5 py-2 bg-purple-500 rounded-md text-white"

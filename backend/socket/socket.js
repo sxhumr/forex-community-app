@@ -35,49 +35,47 @@ export const setupSocket = (io) => {
   io.on("connection", (socket) => {
     console.log(`🟢 Connected: ${socket.user.username}`);
 
-    socket.on("sendMessage", async ({ text, room, media }) => {
-      try {
-        const VALID_TYPES = ["image/jpeg", "image/png"];
-        const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+    
+      socket.on("sendMessage", async ({ text, room, media }) => {
+  try {
+    const VALID_TYPES = ["image/jpeg", "image/png"];
+    const MAX_SIZE = 5 * 1024 * 1024;
 
-        // Validation & Sanitization
-        const safeRoom = VALID_ROOMS.includes(room) ? room : "general-chat";
-        const safeText = typeof text === "string" ? text.trim() : "";
-        let safeMedia = null;
+    const safeText = typeof text === "string" ? text.trim() : "";
 
-        if (media) {
-          const { mimeType, dataUrl, size } = media;
-          if (
-            VALID_TYPES.includes(mimeType) &&
-            dataUrl?.startsWith(`data:${mimeType};base64,`) &&
-            size <= MAX_SIZE
-          ) {
-            safeMedia = { mimeType, dataUrl };
-          } else {
-            console.warn("⚠️ Invalid media blocked from:", socket.user.username);
-          }
-        }
+    let safeMedia = null;
 
-        // Prevent empty messages
-        if (!safeText && !safeMedia) return;
-
-        // Save to Database
-        const saved = await Message.create({
-          text: safeText,
-          room: safeRoom,
-          username: socket.user.username,
-          user: socket.user._id,
-          media: safeMedia,
-        });
-
-        // Broadcast to everyone (or specific room)
-        io.emit("newMessage", saved);
-        console.log(`💾 Message saved in ${safeRoom} by ${socket.user.username}`);
-        
-      } catch (err) {
-        console.error("❌ Send error:", err.message);
+    if (media) {
+      if (
+        VALID_TYPES.includes(media.mimeType) &&
+        media.dataUrl?.startsWith(`data:${media.mimeType};base64,`) &&
+        media.size <= MAX_SIZE
+      ) {
+        safeMedia = {
+          mimeType: media.mimeType,
+          dataUrl: media.dataUrl,
+        };
+      } else {
+        console.log("❌ Invalid image blocked");
       }
+    }
+
+    if (!safeText && !safeMedia) return;
+
+    const saved = await Message.create({
+      text: safeText,
+      room,
+      username: socket.user.username,
+      user: socket.user._id,
+      media: safeMedia,
     });
+
+    io.emit("newMessage", saved);
+  } catch (err) {
+    console.error("Send error:", err.message);
+  }
+});
+
 
     socket.on("disconnect", () => {
       console.log(`🔴 Disconnected: ${socket.user.username}`);
