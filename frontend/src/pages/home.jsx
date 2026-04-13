@@ -13,8 +13,8 @@ const SOCKET_URL =
 
 export default function Home() {
   const navigate = useNavigate();
-  const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
+  const messagesEndRef = useRef(null);
 
   const [messages, setMessages] = useState({
     "general-chat": [],
@@ -27,16 +27,26 @@ export default function Home() {
 
   const [newMessage, setNewMessage] = useState("");
   const [activeRoom, setActiveRoom] = useState("general-chat");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const token = localStorage.getItem("token");
+
+  /* GET USER ID */
+  const getUserId = () => {
+    try {
+      if (!token) return null;
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      return payload.userId;
+    } catch {
+      return null;
+    }
+  };
 
   /* AUTO SCROLL */
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, activeRoom]);
 
-  /* SOCKET SETUP */
+  /* SOCKET */
   useEffect(() => {
     if (!token) {
       navigate("/login");
@@ -45,8 +55,7 @@ export default function Home() {
 
     const socket = io(SOCKET_URL, {
       auth: { token },
-      transports: ["polling"], // Render safe
-      reconnection: true,
+      transports: ["polling"], // Render-safe
     });
 
     socketRef.current = socket;
@@ -59,6 +68,13 @@ export default function Home() {
       setMessages((prev) => ({
         ...prev,
         [message.room]: [...(prev[message.room] || []), message],
+      }));
+    });
+
+    socket.on("messageDeleted", ({ _id, room }) => {
+      setMessages((prev) => ({
+        ...prev,
+        [room]: prev[room].filter((msg) => msg._id !== _id),
       }));
     });
 
@@ -95,11 +111,16 @@ export default function Home() {
     if (!newMessage.trim()) return;
 
     socketRef.current.emit("sendMessage", {
-      text: newMessage.trim(),
+      text: newMessage,
       room: activeRoom,
     });
 
     setNewMessage("");
+  };
+
+  /* DELETE MESSAGE */
+  const deleteMessage = (id) => {
+    socketRef.current.emit("deleteMessage", { id });
   };
 
   /* IMAGE UPLOAD */
@@ -134,131 +155,87 @@ export default function Home() {
     reader.readAsDataURL(file);
   };
 
-  const handleLogout = () => {
-    localStorage.clear();
-    socketRef.current?.disconnect();
-    navigate("/login");
-  };
-
   const rooms = Object.keys(messages);
 
   return (
-    <div className="h-screen flex bg-[#05080f] text-green-200 font-mono">
+    <div className="h-screen flex flex-col bg-[#05080f] text-green-200">
 
-      {/* MOBILE HEADER */}
-      <div className="md:hidden fixed top-0 left-0 right-0 bg-[#0d1320] p-3 flex justify-between items-center z-50">
-        <button onClick={() => setSidebarOpen(!sidebarOpen)}>☰</button>
-        <span className="text-sm">
-          {activeRoom.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase())}
-        </span>
-      </div>
-
-      {/* SIDEBAR */}
-      <div className={`
-        fixed md:relative z-40
-        h-full w-64 bg-[#101521] border-r border-white/10
-        transform transition-transform duration-300
-        ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
-        md:translate-x-0
-      `}>
-        <div className="p-5 border-b border-[#00ff9c]/20">
-          CR MATRIX
-        </div>
-
-        <div className="p-4 space-y-2 text-sm">
-          {rooms.map((room) => (
-            <button
-              key={room}
-              onClick={() => {
-                setActiveRoom(room);
-                setSidebarOpen(false);
-              }}
-              className={`w-full text-left px-3 py-2 rounded-md ${
-                activeRoom === room
-                  ? "bg-[#1b2030]"
-                  : "hover:bg-[#1b2030]"
-              }`}
-            >
-              {room.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase())}
-            </button>
-          ))}
-        </div>
-
-        <div className="p-4">
-          <button onClick={handleLogout} className="text-red-400">
-            Logout
+      {/* ROOM SWITCHER */}
+      <div className="flex gap-2 p-2 border-b border-white/10 overflow-x-auto">
+        {rooms.map((room) => (
+          <button
+            key={room}
+            onClick={() => setActiveRoom(room)}
+            className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
+              activeRoom === room
+                ? "bg-purple-500 text-white"
+                : "bg-[#1b2030]"
+            }`}
+          >
+            {room.replace(/-/g, " ")}
           </button>
-        </div>
+        ))}
       </div>
 
-      {/* CHAT AREA */}
-      <div className="flex-1 flex flex-col pt-12 md:pt-0">
+      {/* MARKET FEED */}
+      {activeRoom === "market-analysis" && <MarketFeed />}
 
-        {/* HEADER */}
-        <div className="hidden md:flex border-b border-white/10 p-4 justify-between">
-          <span>
-            {activeRoom.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase())}
-          </span>
-          <span>{messages[activeRoom]?.length || 0} msgs</span>
-        </div>
+      {/* MESSAGES */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages[activeRoom]?.map((msg) => (
+          <Message
+            key={msg._id}
+            id={msg._id}
+            user={msg.username}
+            text={msg.text}
+            media={msg.media}
+            isOwn={msg.user === getUserId()}
+            onDelete={deleteMessage}
+          />
+        ))}
+        <div ref={messagesEndRef} />
+      </div>
 
-        {/* MARKET FEED */}
-        {activeRoom === "market-analysis" && <MarketFeed />}
+      {/* INPUT AREA */}
+      <div className="p-3 border-t border-white/10 flex gap-2 items-end">
 
-        {/* MESSAGES */}
-        <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-4">
-          {messages[activeRoom]?.map((msg) => (
-            <Message
-              key={msg._id}
-              user={msg.username}
-              text={msg.text}
-              media={msg.media}
-            />
-          ))}
-          <div ref={messagesEndRef} />
-        </div>
+        {/* IMAGE UPLOAD */}
+        <label className="cursor-pointer bg-[#1b2030] px-3 py-2 rounded-md">
+          📷
+          <input
+            type="file"
+            accept="image/jpeg,image/png"
+            className="hidden"
+            onChange={(e) => {
+              handleImageUpload(e.target.files[0]);
+              e.target.value = ""; // 🔥 important fix
+            }}
+          />
+        </label>
 
-        {/* INPUT */}
-        <div className="p-3 border-t border-white/10">
-          <div className="flex gap-2 items-center">
+        {/* TEXT INPUT */}
+        <textarea
+          value={newMessage}
+          onChange={(e) => setNewMessage(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+              e.preventDefault();
+              handleSend();
+            }
+          }}
+          placeholder="Type message... (Ctrl+Enter to send)"
+          rows={1}
+          className="flex-1 bg-[#101829] rounded-md px-3 py-2 resize-none outline-none"
+        />
 
-            {/* 📷 Upload Button */}
-            <label className="cursor-pointer bg-[#1b2030] px-3 py-2 rounded-md">
-              📷
-              <input
-                type="file"
-                accept="image/jpeg,image/png"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files[0];
-                  handleImageUpload(file);
+        {/* SEND BUTTON */}
+        <button
+          onClick={handleSend}
+          className="bg-purple-500 px-4 py-2 rounded-md text-white"
+        >
+          Send
+        </button>
 
-                  // 🔥 critical fix
-                  e.target.value = "";
-                }}
-              />
-            </label>
-
-            {/* TEXT INPUT */}
-            <input
-              type="text"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSend()}
-              placeholder="Type message..."
-              className="flex-1 px-3 py-2 text-sm md:text-base bg-[#101829] rounded-md outline-none"
-            />
-
-            {/* SEND BUTTON */}
-            <button
-              onClick={handleSend}
-              className="px-3 md:px-5 py-2 bg-purple-500 rounded-md text-white"
-            >
-              Send
-            </button>
-
-          </div>
-        </div>
       </div>
     </div>
   );

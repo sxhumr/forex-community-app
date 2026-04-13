@@ -1,23 +1,37 @@
-export default function Message({ user, text, media }) {
+export default function Message({
+  id,
+  user,
+  text,
+  media,
+  isOwn,
+  onDelete,
+}) {
   return (
-    <div className="flex flex-col max-w-[85%] md:max-w-[60%]">
+    <div className="max-w-[80%] group">
 
-      {/* Username */}
-      <span className="text-xs text-green-400 mb-1">
-        {user || "User"}
-      </span>
+      <div className="flex justify-between text-xs text-green-400">
+        <span>{user}</span>
 
-      {/* Bubble */}
-      <div className="bg-[#1b2030] p-3 rounded-xl text-sm md:text-base break-words">
+        {isOwn && (
+          <button
+            onClick={() => onDelete(id)}
+            className="text-red-400 opacity-0 group-hover:opacity-100"
+          >
+            Delete
+          </button>
+        )}
+      </div>
 
-        {/* Text */}
-        {text && <p>{text}</p>}
+      <div className="bg-[#1b2030] p-3 rounded-xl">
 
-        {/* Image */}
+        {text && (
+          <p className="whitespace-pre-wrap">{text}</p>
+        )}
+
         {media?.dataUrl && (
           <img
             src={media.dataUrl}
-            alt="uploaded"
+            alt="upload"
             className="mt-2 rounded-lg max-w-[250px]"
           />
         )}
