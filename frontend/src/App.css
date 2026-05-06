@@ -1,66 +1,67 @@
+/* 1. Root Setup: Fixing the "Web App" bounce */
+:root {
+  --bg-color: #0b0f19;
+  --text-color: #e5e7eb;
+  --scrollbar-bg: #0f172a;
+  --scrollbar-thumb: #1f2937;
+}
 
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100dvh; /* Use Dynamic Viewport Height for mobile */
+  width: 100%;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  
+  /* Critical for "Native" feel: prevents pull-to-refresh bounce */
+  overscroll-behavior: none; 
+  overflow: hidden; /* Prevents whole-page scrolling */
+  
+  /* Prevents iOS from messing with font sizes on rotation */
+  -webkit-text-size-adjust: 100%;
+}
 
 #root {
-  height: 100%;
+  height: 100dvh;
   width: 100%;
-  margin: 0;
-  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Enables inner elements to scroll while the body stays fixed */
 }
 
-
-html,
-body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  background-color: #0b0f19;
-  color: #e5e7eb;
-  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue",
-    sans-serif;
-  overflow: hidden;
-}
-
-
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: #0f172a;
-}
-
-::-webkit-scrollbar-thumb {
-  background-color: #1f2937;
-  border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background-color: #374151;
-}
-
+/* 2. Touch Optimization */
 * {
   box-sizing: border-box;
-}
-
-button {
-  cursor: pointer;
-}
-
-
-button,
-input,
-textarea {
   -webkit-tap-highlight-color: transparent;
+  /* Prevents accidental text selection while scrolling chat */
+  user-select: none;
 }
 
+/* Allow text selection only in specific areas like inputs or copyable messages */
+input, textarea, [contenteditable="true"] {
+  user-select: text;
+  touch-action: manipulation;
+}
 
-input:focus {
+/* 3. Mobile-friendly Inputs */
+input, textarea, button {
+  font-size: 16px; /* Prevents auto-zoom on iOS inputs */
+  border: none;
   outline: none;
 }
 
+/* 4. Refined Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+}
 
-body {
-  min-height: 100vh;
-  min-height: 100dvh;
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 10px;
 }

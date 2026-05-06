@@ -1,30 +1,22 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import crypto from "crypto"; // Use crypto instead of Math.random()
 import User from "../models/user.js";
 import { sendOtp } from "../utils/sendOTP.js";
 
-/* =======================
-   REGISTER
-======================= */
+// Helper to generate secure 6-digit OTP
+const generateOtp = () => crypto.randomInt(100000, 999999).toString();
+
 export const register = async (req, res) => {
   try {
     const { username, email, password } = req.body;
+    if (!username || !email || !password) return res.status(400).json({ message: "All fields are required" });
 
-    if (!username || !email || !password) {
-      return res.status(400).json({ message: "All fields are required" });
-    }
-
-    const existing = await User.findOne({
-      $or: [{ email }, { username }],
-    });
-
-    if (existing) {
-      return res.status(400).json({ message: "User already exists" });
-    }
+    const existing = await User.findOne({ $or: [{ email }, { username }] });
+    if (existing) return res.status(400).json({ message: "User already exists" });
 
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = generateOtp(); // Secure generation
     const hashedOtp = await bcrypt.hash(otp, 10);
 
     await User.create({
@@ -37,7 +29,6 @@ export const register = async (req, res) => {
     });
 
     await sendOtp(email, otp);
-
     return res.status(201).json({ message: "OTP sent to email" });
   } catch (err) {
     console.error("REGISTER ERROR:", err);
@@ -45,22 +36,13 @@ export const register = async (req, res) => {
   }
 };
 
-/* =======================
-   VERIFY OTP
-======================= */
 export const verifyOtp = async (req, res) => {
   try {
     const { email, otp } = req.body;
-
     const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({ message: "User not found" });
-    }
 
-    if (!user.otpHash) return res.status(400).json({ message: "OTP not found" });
-    if (!user.otpExpiresAt || user.otpExpiresAt < Date.now()) {
-      return res.status(400).json({ message: "OTP expired" });
-    }
+    if (!user || !user.otpHash) return res.status(400).json({ message: "Invalid request" });
+    if (user.otpExpiresAt < Date.now()) return res.status(400).json({ message: "OTP expired" });
 
     const isValid = await bcrypt.compare(otp, user.otpHash);
     if (!isValid) return res.status(400).json({ message: "Invalid OTP" });
@@ -77,43 +59,31 @@ export const verifyOtp = async (req, res) => {
   }
 };
 
-/* =======================
-   LOGIN
-======================= */
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email and password required" });
-    }
-
     const user = await User.findOne({ email });
-    if (!user) {
+
+    if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    if (!user.isVerified) {
-      return res.status(403).json({ message: "Please verify your account first" });
-    }
+    if (!user.isVerified) return res.status(403).json({ message: "Please verify your account" });
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ message: "Invalid credentials" });
-    }
-
-    // FIXED: Added username and role to the JWT Payload
     const token = jwt.sign(
-      { 
-        userId: user._id,
-        username: user.username,
-        role: user.role
-      },
+      { userId: user._id, username: user.username, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
-    return res.json({ token });
+    // Optimized: Return user profile + token in one go
+    return res.json({ 
+      token, 
+      user: { 
+        username: user.username, 
+        role: user.role 
+      } 
+    });
   } catch (err) {
     console.error("LOGIN ERROR:", err);
     return res.status(500).json({ message: "Login failed" });

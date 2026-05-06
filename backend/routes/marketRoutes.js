@@ -1,11 +1,22 @@
 import express from "express";
 import axios from "axios";
+import nodeCache from "node-cache"; // You'll need to run: npm install node-cache
 
 const router = express.Router();
+// Cache data for 15 seconds to stay within API limits and boost speed
+const marketCache = new nodeCache({ stdTTL: 15 }); 
 
 router.get("/pair", async (req, res) => {
   try {
-    const symbol = req.query.symbol || "EURUSD";
+    const symbol = (req.query.symbol || "EURUSD").toUpperCase();
+    
+    // 1. Check if we have this price in our "memory" already
+    const cachedData = marketCache.get(symbol);
+    if (cachedData) {
+      return res.json(cachedData);
+    }
+
+    console.log(`🌐 Fetching FRESH data from TwelveData for: ${symbol}`);
 
     const response = await axios.get(
       "https://api.twelvedata.com/time_series",
@@ -20,11 +31,14 @@ router.get("/pair", async (req, res) => {
     );
 
     if (!response.data || response.data.status === "error") {
-      console.log("❌ TwelveData error:", response.data);
-      return res.status(400).json({
-        message: "Market provider error",
-      });
+      // If we have an old version in cache, serve it anyway rather than an error
+      if (cachedData) return res.json(cachedData); 
+      
+      return res.status(400).json({ message: "Market provider error" });
     }
+
+    // 2. Save to cache before sending to user
+    marketCache.set(symbol, response.data);
 
     res.json(response.data);
   } catch (err) {

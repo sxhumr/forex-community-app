@@ -27,6 +27,7 @@ export default function Home() {
 
   const [newMessage, setNewMessage] = useState("");
   const [activeRoom, setActiveRoom] = useState("general-chat");
+  const [isUploading, setIsUploading] = useState(false);
 
   const token = localStorage.getItem("token");
 
@@ -55,14 +56,10 @@ export default function Home() {
 
     const socket = io(SOCKET_URL, {
       auth: { token },
-      transports: ["polling"], // Render-safe
+      transports: ["polling"],
     });
 
     socketRef.current = socket;
-
-    socket.on("connect", () => {
-      console.log("🟢 Socket connected");
-    });
 
     socket.on("newMessage", (message) => {
       setMessages((prev) => ({
@@ -78,33 +75,21 @@ export default function Home() {
       }));
     });
 
-    return () => {
-      socket.disconnect();
-      socketRef.current = null;
-    };
+    return () => socket.disconnect();
   }, [navigate, token]);
 
   /* LOAD MESSAGES */
   useEffect(() => {
     const loadMessages = async () => {
       try {
-        const { data } = await api.get(`/messages?room=${activeRoom}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        setMessages((prev) => ({
-          ...prev,
-          [activeRoom]: data,
-        }));
+        const { data } = await api.get(`/messages?room=${activeRoom}`);
+        setMessages((prev) => ({ ...prev, [activeRoom]: data }));
       } catch (err) {
         console.error("❌ Failed to load messages", err);
       }
     };
-
     loadMessages();
-  }, [activeRoom, token]);
+  }, [activeRoom]);
 
   /* SEND MESSAGE */
   const handleSend = () => {
@@ -113,63 +98,55 @@ export default function Home() {
     socketRef.current.emit("sendMessage", {
       text: newMessage,
       room: activeRoom,
+      mediaUrl: null, // Text-only
     });
 
     setNewMessage("");
   };
 
-  /* DELETE MESSAGE */
-  const deleteMessage = (id) => {
-    socketRef.current.emit("deleteMessage", { id });
-  };
-
-  /* IMAGE UPLOAD */
-  const handleImageUpload = (file) => {
-    if (!file || !socketRef.current) return;
-
-    console.log("📷 Uploading:", file.name);
+  /* IMAGE UPLOAD (The optimized flow) */
+  const handleImageUpload = async (file) => {
+    if (!file || isUploading) return;
 
     if (!["image/jpeg", "image/png"].includes(file.type)) {
       alert("Only JPG and PNG allowed");
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert("Max file size is 5MB");
-      return;
-    }
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
 
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      socketRef.current.emit("sendMessage", {
-        room: activeRoom,
-        media: {
-          mimeType: file.type,
-          dataUrl: reader.result,
-          size: file.size,
-        },
+      // Upload to your new Multer endpoint
+      const { data } = await api.post("/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
       });
-    };
 
-    reader.readAsDataURL(file);
+      // Emit only the URL string, not the file
+      socketRef.current.emit("sendMessage", {
+        text: "",
+        room: activeRoom,
+        mediaUrl: data.url, 
+      });
+    } catch (err) {
+      console.error("Upload failed", err);
+      alert("Image upload failed");
+    } finally {
+      setIsUploading(false);
+    }
   };
-
-  const rooms = Object.keys(messages);
 
   return (
     <div className="h-screen flex flex-col bg-[#05080f] text-green-200">
-
       {/* ROOM SWITCHER */}
       <div className="flex gap-2 p-2 border-b border-white/10 overflow-x-auto">
-        {rooms.map((room) => (
+        {Object.keys(messages).map((room) => (
           <button
             key={room}
             onClick={() => setActiveRoom(room)}
             className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
-              activeRoom === room
-                ? "bg-purple-500 text-white"
-                : "bg-[#1b2030]"
+              activeRoom === room ? "bg-purple-500 text-white" : "bg-[#1b2030]"
             }`}
           >
             {room.replace(/-/g, " ")}
@@ -177,7 +154,6 @@ export default function Home() {
         ))}
       </div>
 
-      {/* MARKET FEED */}
       {activeRoom === "market-analysis" && <MarketFeed />}
 
       {/* MESSAGES */}
@@ -188,9 +164,9 @@ export default function Home() {
             id={msg._id}
             user={msg.username}
             text={msg.text}
-            media={msg.media}
+            mediaUrl={msg.mediaUrl} // Ensure your Message component uses this prop
             isOwn={msg.user === getUserId()}
-            onDelete={deleteMessage}
+            onDelete={(id) => socketRef.current.emit("deleteMessage", { id })}
           />
         ))}
         <div ref={messagesEndRef} />
@@ -198,44 +174,26 @@ export default function Home() {
 
       {/* INPUT AREA */}
       <div className="p-3 border-t border-white/10 flex gap-2 items-end">
-
-        {/* IMAGE UPLOAD */}
-        <label className="cursor-pointer bg-[#1b2030] px-3 py-2 rounded-md">
-          📷
+        <label className={`cursor-pointer bg-[#1b2030] px-3 py-2 rounded-md ${isUploading ? 'opacity-50' : ''}`}>
+          {isUploading ? "..." : "📷"}
           <input
             type="file"
-            accept="image/jpeg,image/png"
             className="hidden"
-            onChange={(e) => {
-              handleImageUpload(e.target.files[0]);
-              e.target.value = ""; // 🔥 important fix
-            }}
+            onChange={(e) => handleImageUpload(e.target.files[0])}
+            disabled={isUploading}
           />
         </label>
 
-        {/* TEXT INPUT */}
         <textarea
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-              e.preventDefault();
-              handleSend();
-            }
-          }}
-          placeholder="Type message... (Ctrl+Enter to send)"
-          rows={1}
+          placeholder="Type message..."
           className="flex-1 bg-[#101829] rounded-md px-3 py-2 resize-none outline-none"
         />
 
-        {/* SEND BUTTON */}
-        <button
-          onClick={handleSend}
-          className="bg-purple-500 px-4 py-2 rounded-md text-white"
-        >
+        <button onClick={handleSend} className="bg-purple-500 px-4 py-2 rounded-md text-white">
           Send
         </button>
-
       </div>
     </div>
   );

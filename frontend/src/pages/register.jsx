@@ -1,39 +1,40 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 
 export default function Register() {
-  const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const navigate = useNavigate();
+  const [formData, setFormData] = useState({
+    username: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
 
   const handleRegister = async (e) => {
     e.preventDefault();
     setError("");
 
-    if (!username || !email || !password) {
-      return setError("All fields are required");
-    }
-
-    if (password !== confirmPassword) {
+    if (formData.password !== formData.confirmPassword) {
       return setError("Passwords do not match");
     }
 
     try {
       setLoading(true);
-
-      await api.post("auth/register", {
-        username,
-        email,
-        password,
+      await api.post("/auth/register", {
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
       });
 
-      // Save email for OTP verification step
-      localStorage.setItem("otpEmail", email);
-
-      window.location.href = "/verify";
+      localStorage.setItem("otpEmail", formData.email);
+      navigate("/verify");
     } catch (err) {
       setError(err.response?.data?.message || "Registration failed");
     } finally {
@@ -42,168 +43,63 @@ export default function Register() {
   };
 
   return (
-    <div style={styles.page}>
-      <div style={styles.card}>
-        <div style={styles.header}>
-          <h1 style={styles.title}>CR MATRIX</h1>
-          <p style={styles.subtitle}>Secure Registration Portal</p>
+    <div className="min-h-screen flex items-center justify-center text-gray-200 bg-[#0b141a] p-4">
+      <div className="w-full max-w-md bg-[#111b21] rounded-2xl border border-white/10 shadow-[0_0_40px_rgba(0,255,156,0.15)] p-8 relative overflow-hidden">
+        {/* Subtle scanline effect */}
+        <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(0,255,156,0.03)_1px,transparent_1px)] bg-[length:100%_3px] opacity-10" />
+
+        <div className="relative mb-8 text-center">
+          <h1 className="text-lg font-mono tracking-[0.35em] text-[#00ff9c]">CR MATRIX</h1>
+          <p className="text-sm text-gray-400 mt-2">Secure Registration Portal</p>
         </div>
 
-        {error && <div style={styles.error}>{error}</div>}
+        {error && (
+          <div className="mb-5 bg-red-500/10 border border-red-500/20 text-red-300 text-sm px-4 py-3 rounded-lg text-center animate-pulse">
+            {error}
+          </div>
+        )}
 
-        <form onSubmit={handleRegister} style={styles.form}>
-          <Input
-            placeholder="USERNAME"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-          />
-          <Input
-            placeholder="EMAIL"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <Input
-            placeholder="PASSWORD"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <Input
-            placeholder="CONFIRM PASSWORD"
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-          />
+        <form onSubmit={handleRegister} className="space-y-4 relative">
+          {["username", "email", "password", "confirmPassword"].map((field) => (
+            <div key={field}>
+              <label className="block text-xs font-mono tracking-widest text-gray-400 mb-1 uppercase">
+                {field.replace(/([A-Z])/g, " $1")}
+              </label>
+              <input
+                name={field}
+                type={field.includes("password") ? "password" : field === "email" ? "email" : "text"}
+                required
+                value={formData[field]}
+                onChange={handleChange}
+                className="w-full bg-[#0b141a] border border-white/10 rounded-lg px-4 py-3 outline-none focus:border-[#00ff9c] focus:ring-1 focus:ring-[#00ff9c]/40 transition"
+                placeholder={field === "username" ? "e.g. Neo" : "••••••••"}
+              />
+            </div>
+          ))}
 
           <button
             type="submit"
             disabled={loading}
-            style={{
-              ...styles.button,
-              opacity: loading ? 0.6 : 1,
-            }}
+            className={`w-full mt-4 py-3 rounded-lg text-base font-medium tracking-wide transition ${
+              loading 
+                ? "opacity-70 cursor-wait" 
+                : "bg-[#00a884] hover:brightness-110 shadow-[0_0_16px_rgba(0,255,156,0.35)]"
+            } text-black`}
           >
             {loading ? "INITIALIZING…" : "ENTER MATRIX"}
           </button>
         </form>
 
-        <div style={styles.footer}>
-          <span>Already inside?</span>
-          <span
-            style={styles.link}
-            onClick={() => (window.location.href = "/login")}
+        <p className="relative text-center text-xs text-gray-500 mt-8">
+          Already inside?{" "}
+          <span 
+            className="text-[#00ff9c] cursor-pointer hover:underline" 
+            onClick={() => navigate("/login")}
           >
             Login
           </span>
-        </div>
+        </p>
       </div>
     </div>
   );
 }
-
-/* ---------- Reusable Input ---------- */
-function Input(props) {
-  return <input {...props} style={styles.input} autoComplete="off" />;
-}
-
-/* ---------- Styles ---------- */
-const styles = {
-  page: {
-    minHeight: "100vh",
-    background:
-      "radial-gradient(circle at top, rgba(0,255,156,0.05), transparent 60%), #0b141a",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontFamily: "'JetBrains Mono', monospace",
-    color: "#e5e7eb",
-  },
-
-  card: {
-    width: 440,
-    padding: "40px 36px",
-    background: "rgba(17, 27, 33, 0.92)",
-    borderRadius: 16,
-    border: "1px solid rgba(255,255,255,0.08)",
-    boxShadow: "0 0 40px rgba(0,255,156,0.15)",
-    backdropFilter: "blur(8px)",
-  },
-
-  header: {
-    textAlign: "center",
-    marginBottom: 30,
-  },
-
-  title: {
-    margin: 0,
-    fontSize: 20,
-    letterSpacing: 4,
-    color: "#00ff9c",
-  },
-
-  subtitle: {
-    marginTop: 8,
-    fontSize: 13,
-    color: "rgba(229,231,235,0.6)",
-  },
-
-  error: {
-    background: "rgba(239,68,68,0.12)",
-    border: "1px solid rgba(239,68,68,0.25)",
-    color: "#fca5a5",
-    padding: "10px 12px",
-    borderRadius: 8,
-    fontSize: 13,
-    marginBottom: 18,
-    textAlign: "center",
-  },
-
-  form: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 16,
-  },
-
-  input: {
-    background: "#0b141a",
-    border: "1px solid rgba(255,255,255,0.12)",
-    borderRadius: 10,
-    padding: "14px 16px",
-    color: "#e5e7eb",
-    outline: "none",
-    fontSize: 14,
-    letterSpacing: 0.5,
-  },
-
-  button: {
-    marginTop: 20,
-    padding: "14px",
-    background:
-      "linear-gradient(135deg, #00a884 0%, #00ff9c 100%)",
-    color: "#001b12",
-    border: "none",
-    borderRadius: 10,
-    cursor: "pointer",
-    fontWeight: 600,
-    fontSize: 14,
-    letterSpacing: 2,
-    boxShadow: "0 0 18px rgba(0,255,156,0.35)",
-  },
-
-  footer: {
-    marginTop: 26,
-    display: "flex",
-    justifyContent: "center",
-    gap: 8,
-    fontSize: 12,
-    color: "rgba(229,231,235,0.6)",
-  },
-
-  link: {
-    cursor: "pointer",
-    color: "#00ff9c",
-    textDecoration: "underline",
-  },
-};
-

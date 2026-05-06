@@ -4,19 +4,21 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import cors from "cors";
 import { Server } from "socket.io";
+import helmet from "helmet"; // Added for security
+import compression from "compression"; // Added for performance
 import marketRoutes from "./routes/marketRoutes.js";
-
-// Routes
 import authRoutes from "./routes/authRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";
-
-// Socket setup
 import { setupSocket } from "./socket/socket.js";
 
 dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
+
+// 1. Security & Performance Middleware
+app.use(helmet()); // Protects against common web vulnerabilities
+app.use(compression()); // Compresses responses, significantly improving speed
 
 const configuredOrigins = (process.env.FRONTEND_URL || "")
   .split(",")
@@ -37,7 +39,11 @@ const corsOrigin = (origin, callback) => {
 };
 
 app.use(cors({ origin: corsOrigin, credentials: true }));
-app.use(express.json());
+
+// 2. Optimized Body Parsers
+// Increased limit to 10MB to allow for larger JSON payloads (e.g., text/small meta-data)
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
@@ -47,7 +53,6 @@ app.get("/", (req, res) => {
   res.send("Forex backend running 🚀");
 });
 
-// IMPROVED: Added websocket transport for lower latency
 const io = new Server(server, {
   cors: {
     origin: corsOrigin,
@@ -59,8 +64,12 @@ const io = new Server(server, {
 
 setupSocket(io);
 
+// 3. Optimized Database Connection
 mongoose
-  .connect(process.env.MONGO_URI)
+  .connect(process.env.MONGO_URI, {
+    maxPoolSize: 50, // Increases concurrent connections, crucial for chat apps
+    serverSelectionTimeoutMS: 5000,
+  })
   .then(() => console.log("✅ MongoDB connected"))
   .catch((err) => {
     console.error("❌ MongoDB connection error:", err);
