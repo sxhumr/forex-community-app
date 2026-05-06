@@ -2,28 +2,25 @@ import jwt from "jsonwebtoken";
 
 export const protectRoute = async (req, res, next) => {
   try {
+    // 1. Get the Authorization header
     const authHeader = req.headers.authorization;
 
+    // 2. Check if it exists and starts with "Bearer "
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ message: "Unauthorized: No token provided" });
+      return res.status(401).json({ error: "Unauthorized - No Token Provided" });
     }
 
+    // 3. Extract the token (everything after "Bearer ")
     const token = authHeader.split(" ")[1];
-    
-    // Verify the token
+
+    // 4. Verify the token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // If verification passes, the data is in 'decoded'.
-    // We attach it to 'req.user' so your routes can access it immediately.
-    // No DB query needed!
-    if (!decoded.isVerified) {
-      return res.status(401).json({ message: "Unauthorized: User not verified" });
-    }
-
+    // 5. Attach user information to the request
     req.user = decoded; 
+
     next();
-  } catch (err) {
-    // If token is expired or tampered with
-    return res.status(401).json({ message: "Unauthorized: Invalid token" });
+  } catch (error) {
+    return res.status(401).json({ error: "Unauthorized - Invalid Token" });
   }
 };
